@@ -1,0 +1,147 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ============================================================================
+// User Model
+// ============================================================================
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String   @unique
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One-to-Many: A user can own many projects
+  ownedProjects Project[] @relation("ProjectOwner")
+
+  // Many-to-Many: A user can be a member of many projects
+  memberProjects ProjectMember[]
+
+  // One-to-Many: A user can create many tasks
+  createdTasks Task[] @relation("TaskCreator")
+
+  // One-to-Many: A user can be assigned many tasks
+  assignedTasks Task[] @relation("TaskAssignee")
+
+  // One-to-Many: A user can write many comments
+  comments Comment[]
+}
+
+// ============================================================================
+// Project Model (One-to-Many with User, Many-to-Many with User via ProjectMember)
+// ============================================================================
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  status      String   @default("active") // active, archived, completed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Many-to-One: Each project has one owner
+  ownerId Int
+  owner   User @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // One-to-Many: A project can have many tasks
+  tasks Task[]
+
+  // Many-to-Many: A project can have many members
+  members ProjectMember[]
+}
+
+// ============================================================================
+// ProjectMember Model (Junction table for Many-to-Many: User <-> Project)
+// ============================================================================
+
+model ProjectMember {
+  id        Int      @id @default(autoincrement())
+  role      String   @default("member") // owner, admin, member, viewer
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    Int
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+}
+
+// ============================================================================
+// Task Model (Many-to-One with Project, Many-to-One with User)
+// ============================================================================
+
+model Task {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  status      String    @default("todo") // todo, in_progress, review, done
+  priority    String    @default("medium") // low, medium, high, urgent
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Many-to-One: Each task belongs to a project
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Many-to-One: Each task has a creator
+  creatorId Int
+  creator   User @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  // Many-to-One: Each task can be assigned to a user (optional)
+  assigneeId Int?
+  assignee   User? @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  // One-to-Many: A task can have many comments
+  comments Comment[]
+}
+
+// ============================================================================
+// Comment Model (Many-to-One with Task, Many-to-One with User)
+// ============================================================================
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Many-to-One: Each comment belongs to a task
+  taskId Int
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  // Many-to-One: Each comment is written by a user
+  authorId Int
+  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// SavedFilter Model - Store user filter preferences per page
+// ============================================================================
+
+model SavedFilter {
+  id        Int      @id @default(autoincrement())
+  name      String   // Filter preset name (e.g., "default", "my-filters")
+  page      String   // Page identifier (e.g., "table", "projects")
+  filters   String   // JSON string containing filter values
+  isDefault Boolean  @default(false) // Whether this is the default filter for the page
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, page]) // Each filter name must be unique per page
+}
