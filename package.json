@@ -24,7 +24,8 @@
     "lodash": "^4.17.21",
     "mockjs": "^1.1.0",
     "prisma": "^7.0.1",
-    "tsx": "^4.20.6"
+    "tsx": "^4.20.6",
+    "umi-app": "link:"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

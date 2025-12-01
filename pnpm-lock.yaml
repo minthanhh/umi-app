@@ -47,6 +47,9 @@ importers:
       tsx:
         specifier: ^4.20.6
         version: 4.21.0
+      umi-app:
+        specifier: 'link:'
+        version: 'link:'
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
