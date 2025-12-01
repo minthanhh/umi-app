@@ -2,6 +2,7 @@ import { defineConfig } from '@umijs/max';
 
 export default defineConfig({
   mock: false,
+  esbuildMinifyIIFE: true,
   apiRoute: {
     platform: 'vercel',
   },
@@ -20,7 +21,7 @@ export default defineConfig({
     // antd <App /> valid for version 5.1.0 or higher, default: undefined
     appConfig: {},
     // Transform DayJS to MomentJS
-    momentPicker: true,
+    momentPicker: false,
     // Add StyleProvider for legacy browsers
     styleProvider: {
       hashPriority: 'high',

@@ -1,4 +1,3 @@
-import Select from '@/components/Select/Select';
 import { PageContainer } from '@ant-design/pro-components';
 import { useAccess } from '@umijs/max';
 
@@ -8,17 +7,13 @@ const AccessPage: React.FC = () => {
     <PageContainer
       ghost
       header={{
-        title: '权限示例',
+        title: 'Access Control',
       }}
     >
-      <Select
-        mode="multiple"
-        placeholder="Select an option"
-        options={[
-          { label: 'Option 1', value: '1' },
-          { label: 'Option 2', value: '2' },
-        ]}
-      />
+      <p>Current access permissions:</p>
+      <pre className="bg-gray-50 p-4 rounded mt-2 overflow-auto">
+        {JSON.stringify(access, null, 2)}
+      </pre>
     </PageContainer>
   );
 };

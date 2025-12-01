@@ -89,18 +89,19 @@ const HomePage: React.FC = () => {
     },
   });
 
-  const createMutation = useMutation(
-    createUser,
-    mutationConfig('User created successfully'),
-  );
-  const updateMutation = useMutation(
-    updateUser,
-    mutationConfig('User updated successfully'),
-  );
-  const deleteMutation = useMutation(
-    deleteUser,
-    mutationConfig('User deleted successfully'),
-  );
+  const createMutation = useMutation({
+    mutationFn: createUser,
+    ...mutationConfig('User created successfully'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: updateUser,
+    ...mutationConfig('User updated successfully'),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: deleteUser,
+    ...mutationConfig('User deleted successfully'),
+  });
 
   const handleAdd = async (fields: Partial<User>) => {
     await createMutation.mutateAsync(fields);
