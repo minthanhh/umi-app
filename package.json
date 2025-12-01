@@ -14,7 +14,7 @@
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "@ant-design/pro-components": "^2.8.10",
-    "@prisma/adapter-libsql": "^7.0.1",
+    "@prisma/adapter-pg": "^7.0.1",
     "@prisma/client": "^7.0.1",
     "@tanstack/react-query": "^5.90.11",
     "@umijs/max": "^4.6.0",
