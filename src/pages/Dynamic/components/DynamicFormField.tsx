@@ -1,3 +1,4 @@
+import { QuestionCircleOutlined } from '@ant-design/icons';
 import {
   Checkbox,
   DatePicker,
@@ -9,7 +10,6 @@ import {
   Switch,
   Tooltip,
 } from 'antd';
-import { QuestionCircleOutlined } from '@ant-design/icons';
 import React from 'react';
 import type { FieldConfig } from '../types';
 import InfiniteScrollSelect from './InfiniteScrollSelect';
@@ -31,7 +31,8 @@ interface DynamicFormFieldProps {
 // ============================================================================
 
 const DynamicFormField: React.FC<DynamicFormFieldProps> = ({ field, size }) => {
-  const { name, label, type, placeholder, disabled, hidden, rules, tooltip } = field;
+  const { name, label, type, placeholder, disabled, hidden, rules, tooltip } =
+    field;
 
   if (hidden) return null;
 
@@ -190,12 +191,17 @@ const DynamicFormField: React.FC<DynamicFormFieldProps> = ({ field, size }) => {
       }
 
       default:
-        return <Input placeholder={placeholder} disabled={disabled} size={size} />;
+        return (
+          <Input placeholder={placeholder} disabled={disabled} size={size} />
+        );
     }
   };
 
   // Special handling for checkbox without options (single checkbox)
-  if (type === 'checkbox' && (!('options' in field) || !field.options?.length)) {
+  if (
+    type === 'checkbox' &&
+    (!('options' in field) || !field.options?.length)
+  ) {
     return (
       <Form.Item name={name} valuePropName="checked" rules={rules}>
         {renderField()}
@@ -206,7 +212,12 @@ const DynamicFormField: React.FC<DynamicFormFieldProps> = ({ field, size }) => {
   // Special handling for switch
   if (type === 'switch') {
     return (
-      <Form.Item name={name} label={renderLabel()} valuePropName="checked" rules={rules}>
+      <Form.Item
+        name={name}
+        label={renderLabel()}
+        valuePropName="checked"
+        rules={rules}
+      >
         {renderField()}
       </Form.Item>
     );

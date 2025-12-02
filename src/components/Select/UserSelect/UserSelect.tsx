@@ -103,13 +103,22 @@ const UserSelect: React.FC<UserSelectProps> = ({
     (e: React.UIEvent<HTMLDivElement>) => {
       const target = e.target as HTMLDivElement;
       const isNearBottom =
-        target.scrollTop + target.offsetHeight >= target.scrollHeight - SCROLL_THRESHOLD;
+        target.scrollTop + target.offsetHeight >=
+        target.scrollHeight - SCROLL_THRESHOLD;
 
-      if (isNearBottom && dataSources.hasNextPage && !dataSources.isFetchingMore) {
+      if (
+        isNearBottom &&
+        dataSources.hasNextPage &&
+        !dataSources.isFetchingMore
+      ) {
         dataSources.fetchNextPage();
       }
     },
-    [dataSources.hasNextPage, dataSources.isFetchingMore, dataSources.fetchNextPage],
+    [
+      dataSources.hasNextPage,
+      dataSources.isFetchingMore,
+      dataSources.fetchNextPage,
+    ],
   );
 
   // Render dropdown with loading indicator
@@ -123,7 +132,7 @@ const UserSelect: React.FC<UserSelectProps> = ({
     [dataSources.isFetchingMore],
   );
 
-  console.log("RE-RENDER")
+  console.log('RE-RENDER');
 
   return (
     <Select

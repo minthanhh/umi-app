@@ -1,5 +1,5 @@
-import { Select, Spin } from 'antd';
 import type { SelectProps } from 'antd';
+import { Select, Spin } from 'antd';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { InfiniteSelectConfig, SelectOption } from '../types';
 
@@ -7,7 +7,10 @@ import type { InfiniteSelectConfig, SelectOption } from '../types';
 // Types
 // ============================================================================
 
-interface InfiniteScrollSelectProps extends Omit<SelectProps, 'options' | 'onSearch'> {
+interface InfiniteScrollSelectProps extends Omit<
+  SelectProps,
+  'options' | 'onSearch'
+> {
   config: InfiniteSelectConfig;
 }
 
@@ -96,7 +99,10 @@ const InfiniteScrollSelect: React.FC<InfiniteScrollSelectProps> = ({
 
         const result = await response.json();
 
-        const data = getNestedValue(result, responseDataPath) as Record<string, unknown>[];
+        const data = getNestedValue(result, responseDataPath) as Record<
+          string,
+          unknown
+        >[];
         const total = getNestedValue(result, responseTotalPath) as number;
 
         const newOptions: SelectOption[] = (data || []).map((item) => ({
@@ -119,7 +125,18 @@ const InfiniteScrollSelect: React.FC<InfiniteScrollSelectProps> = ({
         setLoadingMore(false);
       }
     },
-    [apiUrl, method, searchParam, pageParam, pageSizeParam, pageSize, labelField, valueField, responseDataPath, responseTotalPath],
+    [
+      apiUrl,
+      method,
+      searchParam,
+      pageParam,
+      pageSizeParam,
+      pageSize,
+      labelField,
+      valueField,
+      responseDataPath,
+      responseTotalPath,
+    ],
   );
 
   // Initial fetch

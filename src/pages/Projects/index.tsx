@@ -6,7 +6,7 @@ import {
   TeamOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons';
-import { useQuery, useMutation, useQueryClient, history } from '@umijs/max';
+import { history, useMutation, useQuery, useQueryClient } from '@umijs/max';
 import {
   Avatar,
   Badge,
@@ -108,7 +108,13 @@ const ProjectsPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, values }: { id: number; values: Partial<ProjectFormValues> }) => {
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: number;
+      values: Partial<ProjectFormValues>;
+    }) => {
       const response = await fetch(`/api/projects/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -177,7 +183,11 @@ const ProjectsPage: React.FC = () => {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold m-0">Projects</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => handleOpenModal()}
+        >
           New Project
         </Button>
       </div>
@@ -194,7 +204,9 @@ const ProjectsPage: React.FC = () => {
                 hoverable
                 actions={[
                   <Tooltip title="View Details" key="view">
-                    <EyeOutlined onClick={() => history.push(`/projects/${project.id}`)} />
+                    <EyeOutlined
+                      onClick={() => history.push(`/projects/${project.id}`)}
+                    />
                   </Tooltip>,
                   <Tooltip title="Edit" key="edit">
                     <EditOutlined onClick={() => handleOpenModal(project)} />
@@ -220,7 +232,9 @@ const ProjectsPage: React.FC = () => {
                   title={
                     <div className="flex items-center justify-between">
                       <span className="truncate">{project.name}</span>
-                      <Tag color={statusColors[project.status]}>{project.status}</Tag>
+                      <Tag color={statusColors[project.status]}>
+                        {project.status}
+                      </Tag>
                     </div>
                   }
                   description={
@@ -232,12 +246,20 @@ const ProjectsPage: React.FC = () => {
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <Space size="large">
                     <Tooltip title="Team Members">
-                      <Badge count={project._count.members} showZero color="blue">
+                      <Badge
+                        count={project._count.members}
+                        showZero
+                        color="blue"
+                      >
                         <TeamOutlined className="text-lg" />
                       </Badge>
                     </Tooltip>
                     <Tooltip title="Tasks">
-                      <Badge count={project._count.tasks} showZero color="green">
+                      <Badge
+                        count={project._count.tasks}
+                        showZero
+                        color="green"
+                      >
                         <UnorderedListOutlined className="text-lg" />
                       </Badge>
                     </Tooltip>
@@ -247,7 +269,9 @@ const ProjectsPage: React.FC = () => {
                     <Progress
                       percent={Math.floor(Math.random() * 100)}
                       size="small"
-                      status={project.status === 'completed' ? 'success' : 'active'}
+                      status={
+                        project.status === 'completed' ? 'success' : 'active'
+                      }
                     />
                   </div>
                 </div>

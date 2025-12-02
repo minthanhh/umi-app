@@ -1,5 +1,5 @@
 import { UmiApiRequest, UmiApiResponse } from '@umijs/max';
-import { prisma } from 'lib/prisma';
+import prisma from 'lib/prisma';
 
 export default async function (req: UmiApiRequest, res: UmiApiResponse) {
   switch (req.method) {
@@ -26,7 +26,7 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
         if (assigneeId) where.assigneeId = parseInt(assigneeId as string, 10);
         if (creatorId) where.creatorId = parseInt(creatorId as string, 10);
 
-        const [tasks, total] = await prisma.$transaction([
+        const [tasks, total] = await Promise.all([
           prisma.task.findMany({
             skip,
             take: limit,

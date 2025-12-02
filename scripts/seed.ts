@@ -1,4 +1,4 @@
-import { prisma } from 'lib/prisma';
+import prisma from 'lib/prisma';
 import mock from 'mockjs';
 
 async function main() {
@@ -73,7 +73,10 @@ async function main() {
     // Add 2-4 random members to each project
     const memberCount = mock.Random.integer(2, 4);
     const availableUsers = users.filter((u) => u.id !== project.ownerId);
-    const selectedUsers = mock.Random.shuffle(availableUsers).slice(0, memberCount);
+    const selectedUsers = mock.Random.shuffle(availableUsers).slice(
+      0,
+      memberCount,
+    );
 
     for (const user of selectedUsers) {
       memberPromises.push(
@@ -81,7 +84,9 @@ async function main() {
           data: {
             userId: user.id,
             projectId: project.id,
-            role: ['admin', 'member', 'member', 'viewer'][mock.Random.integer(0, 3)],
+            role: ['admin', 'member', 'member', 'viewer'][
+              mock.Random.integer(0, 3)
+            ],
           },
         }),
       );
@@ -118,10 +123,10 @@ async function main() {
     projects.flatMap((project) =>
       Array.from({ length: mock.Random.integer(5, 8) }, () => {
         const projectMembers = users.slice(0, mock.Random.integer(3, 6));
-        const creator = projectMembers[mock.Random.integer(0, projectMembers.length - 1)];
-        const assignee =
-          mock.Random.boolean() ?
-            projectMembers[mock.Random.integer(0, projectMembers.length - 1)]
+        const creator =
+          projectMembers[mock.Random.integer(0, projectMembers.length - 1)];
+        const assignee = mock.Random.boolean()
+          ? projectMembers[mock.Random.integer(0, projectMembers.length - 1)]
           : null;
 
         return prisma.task.create({
@@ -130,9 +135,10 @@ async function main() {
             description: mock.Random.paragraph(1),
             status: statuses[mock.Random.integer(0, statuses.length - 1)],
             priority: priorities[mock.Random.integer(0, priorities.length - 1)],
-            dueDate:
-              mock.Random.boolean() ?
-                new Date(Date.now() + mock.Random.integer(1, 30) * 24 * 60 * 60 * 1000)
+            dueDate: mock.Random.boolean()
+              ? new Date(
+                  Date.now() + mock.Random.integer(1, 30) * 24 * 60 * 60 * 1000,
+                )
               : null,
             projectId: project.id,
             creatorId: creator.id,
@@ -166,7 +172,10 @@ async function main() {
         Array.from({ length: mock.Random.integer(1, 4) }, () =>
           prisma.comment.create({
             data: {
-              content: commentTemplates[mock.Random.integer(0, commentTemplates.length - 1)],
+              content:
+                commentTemplates[
+                  mock.Random.integer(0, commentTemplates.length - 1)
+                ],
               taskId: task.id,
               authorId: users[mock.Random.integer(0, users.length - 1)].id,
             },

@@ -1,6 +1,5 @@
 // Main component export
-export { default } from './UserSelect';
-export { default as UserSelect } from './UserSelect';
+export { default as UserSelect, default } from './UserSelect';
 
 // Type exports for consumers
 export type {

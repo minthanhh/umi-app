@@ -1,5 +1,10 @@
-import { DeleteOutlined, SaveOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
-import { useQuery, useMutation, useQueryClient } from '@umijs/max';
+import {
+  DeleteOutlined,
+  SaveOutlined,
+  StarFilled,
+  StarOutlined,
+} from '@ant-design/icons';
+import { useMutation, useQuery, useQueryClient } from '@umijs/max';
 import {
   Avatar,
   Button,
@@ -104,7 +109,9 @@ const priorityColors: Record<string, string> = {
 
 const DependentSelectsPage: React.FC = () => {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
+    null,
+  );
   const [pendingProjectId, setPendingProjectId] = useState<number | null>(null); // For loading from saved filter
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [filterName, setFilterName] = useState('');
@@ -147,11 +154,19 @@ const DependentSelectsPage: React.FC = () => {
   // Load default filter on mount - wait for both users AND savedFilters to be ready
   useEffect(() => {
     // Only initialize once both users and savedFilters have loaded
-    if (!isInitialized && !isLoadingUsers && !isLoadingSavedFilters && users && users.length > 0) {
+    if (
+      !isInitialized &&
+      !isLoadingUsers &&
+      !isLoadingSavedFilters &&
+      users &&
+      users.length > 0
+    ) {
       const defaultFilter = savedFilters.find((f) => f.isDefault);
       if (defaultFilter?.filters?.userId) {
         // Verify the user exists in our loaded users
-        const userExists = users.some((u) => u.id === defaultFilter.filters.userId);
+        const userExists = users.some(
+          (u) => u.id === defaultFilter.filters.userId,
+        );
         if (userExists) {
           setSelectedUserId(defaultFilter.filters.userId);
           // Store projectId as pending - will be applied after projects load
@@ -161,7 +176,13 @@ const DependentSelectsPage: React.FC = () => {
       }
       setIsInitialized(true);
     }
-  }, [savedFilters, users, isLoadingUsers, isLoadingSavedFilters, isInitialized]);
+  }, [
+    savedFilters,
+    users,
+    isLoadingUsers,
+    isLoadingSavedFilters,
+    isInitialized,
+  ]);
 
   // Fetch projects for selected user
   const { data: projects, isLoading: isLoadingProjects } = useQuery({
@@ -345,14 +366,18 @@ const DependentSelectsPage: React.FC = () => {
       dataIndex: 'status',
       key: 'status',
       render: (status) => (
-        <Tag color={statusColors[status]}>{status.replace('_', ' ').toUpperCase()}</Tag>
+        <Tag color={statusColors[status]}>
+          {status.replace('_', ' ').toUpperCase()}
+        </Tag>
       ),
     },
     {
       title: 'Priority',
       dataIndex: 'priority',
       key: 'priority',
-      render: (priority) => <Tag color={priorityColors[priority]}>{priority.toUpperCase()}</Tag>,
+      render: (priority) => (
+        <Tag color={priorityColors[priority]}>{priority.toUpperCase()}</Tag>
+      ),
     },
     {
       title: 'Assignee',
@@ -382,9 +407,12 @@ const DependentSelectsPage: React.FC = () => {
     <div>
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h2 className="text-xl font-semibold mb-1">Dependent Selects with Saved Filters</h2>
+          <h2 className="text-xl font-semibold mb-1">
+            Dependent Selects with Saved Filters
+          </h2>
           <p className="text-gray-500 text-sm m-0">
-            Select User → Project → View Tasks. Save your filter selections to reload later.
+            Select User → Project → View Tasks. Save your filter selections to
+            reload later.
           </p>
         </div>
         <Space>
@@ -460,7 +488,9 @@ const DependentSelectsPage: React.FC = () => {
               onChange={handleUserChange}
               showSearch
               filterOption={(input, option) =>
-                (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                (option?.label as string)
+                  ?.toLowerCase()
+                  .includes(input.toLowerCase())
               }
               options={users?.map((user) => ({
                 value: user.id,
@@ -486,7 +516,9 @@ const DependentSelectsPage: React.FC = () => {
           <Col xs={24} sm={8}>
             <div className="mb-2 font-medium">2. Select Project</div>
             <Select
-              placeholder={selectedUserId ? 'Select a project...' : 'Select a user first'}
+              placeholder={
+                selectedUserId ? 'Select a project...' : 'Select a user first'
+              }
               style={{ width: '100%' }}
               loading={isLoadingProjects}
               allowClear
@@ -495,7 +527,9 @@ const DependentSelectsPage: React.FC = () => {
               onChange={handleProjectChange}
               showSearch
               filterOption={(input, option) =>
-                (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                (option?.label as string)
+                  ?.toLowerCase()
+                  .includes(input.toLowerCase())
               }
               options={projects?.map((project) => ({
                 value: project.id,
@@ -507,12 +541,16 @@ const DependentSelectsPage: React.FC = () => {
                   <div>
                     <div className="flex justify-between items-center">
                       <span>{project?.name}</span>
-                      <Tag color={statusColors[project?.status || 'active']} className="ml-2">
+                      <Tag
+                        color={statusColors[project?.status || 'active']}
+                        className="ml-2"
+                      >
                         {project?.status}
                       </Tag>
                     </div>
                     <div className="text-xs text-gray-400">
-                      {project?._count.tasks} tasks • {project?._count.members} members
+                      {project?._count.tasks} tasks • {project?._count.members}{' '}
+                      members
                     </div>
                   </div>
                 );
@@ -531,7 +569,9 @@ const DependentSelectsPage: React.FC = () => {
               {selectedProjectId ? (
                 <Tag color="blue">{tasks?.length ?? 0} tasks loaded</Tag>
               ) : (
-                <span className="text-gray-400">Select a project to view tasks</span>
+                <span className="text-gray-400">
+                  Select a project to view tasks
+                </span>
               )}
             </div>
           </Col>
@@ -549,7 +589,9 @@ const DependentSelectsPage: React.FC = () => {
                 </Avatar>
                 <div>
                   <div className="font-semibold">{selectedUser.name}</div>
-                  <div className="text-gray-500 text-sm">{selectedUser.email}</div>
+                  <div className="text-gray-500 text-sm">
+                    {selectedUser.email}
+                  </div>
                 </div>
               </Space>
             </Card>
@@ -560,11 +602,17 @@ const DependentSelectsPage: React.FC = () => {
           <Col xs={24} md={12}>
             <Card title="Selected Project" size="small">
               <Descriptions column={2} size="small">
-                <Descriptions.Item label="Name">{selectedProject.name}</Descriptions.Item>
-                <Descriptions.Item label="Status">
-                  <Tag color={statusColors[selectedProject.status]}>{selectedProject.status}</Tag>
+                <Descriptions.Item label="Name">
+                  {selectedProject.name}
                 </Descriptions.Item>
-                <Descriptions.Item label="Tasks">{selectedProject._count.tasks}</Descriptions.Item>
+                <Descriptions.Item label="Status">
+                  <Tag color={statusColors[selectedProject.status]}>
+                    {selectedProject.status}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="Tasks">
+                  {selectedProject._count.tasks}
+                </Descriptions.Item>
                 <Descriptions.Item label="Members">
                   {selectedProject._count.members}
                 </Descriptions.Item>
@@ -588,7 +636,9 @@ const DependentSelectsPage: React.FC = () => {
             dataSource={tasks}
             rowKey="id"
             pagination={{ pageSize: 10 }}
-            locale={{ emptyText: <Empty description="No tasks in this project" /> }}
+            locale={{
+              emptyText: <Empty description="No tasks in this project" />,
+            }}
           />
         )}
       </Card>
@@ -607,7 +657,9 @@ const DependentSelectsPage: React.FC = () => {
       >
         <div className="py-4">
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Filter Name</label>
+            <label className="block text-sm font-medium mb-2">
+              Filter Name
+            </label>
             <Input
               placeholder="Enter a name for this filter"
               value={filterName}
@@ -623,7 +675,9 @@ const DependentSelectsPage: React.FC = () => {
                 onChange={(e) => setIsDefaultFilter(e.target.checked)}
                 className="w-4 h-4"
               />
-              <span className="text-sm">Set as default filter (auto-load on page visit)</span>
+              <span className="text-sm">
+                Set as default filter (auto-load on page visit)
+              </span>
             </label>
           </div>
           <Divider />

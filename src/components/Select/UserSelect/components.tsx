@@ -80,21 +80,23 @@ interface LoadingTagProps {
   onClose: () => void;
 }
 
-export const LoadingTag = memo<LoadingTagProps>(({ value, closable, onClose }) => (
-  <Tag
-    color="default"
-    closable={closable}
-    onClose={onClose}
-    style={{ display: 'flex', alignItems: 'center' }}
-  >
-    <Spin
-      indicator={<LoadingOutlined style={{ fontSize: 12 }} spin />}
-      size="small"
-      style={{ marginRight: 6 }}
-    />
-    Loading ID {value}...
-  </Tag>
-));
+export const LoadingTag = memo<LoadingTagProps>(
+  ({ value, closable, onClose }) => (
+    <Tag
+      color="default"
+      closable={closable}
+      onClose={onClose}
+      style={{ display: 'flex', alignItems: 'center' }}
+    >
+      <Spin
+        indicator={<LoadingOutlined style={{ fontSize: 12 }} spin />}
+        size="small"
+        style={{ marginRight: 6 }}
+      />
+      Loading ID {value}...
+    </Tag>
+  ),
+);
 
 LoadingTag.displayName = 'LoadingTag';
 
@@ -109,15 +111,17 @@ interface DefaultTagProps {
   onClose: () => void;
 }
 
-export const DefaultTag = memo<DefaultTagProps>(({ label, closable, onClose }) => (
-  <Tag
-    closable={closable}
-    onClose={onClose}
-    style={{ display: 'flex', alignItems: 'center', padding: '4px 8px' }}
-  >
-    {label}
-  </Tag>
-));
+export const DefaultTag = memo<DefaultTagProps>(
+  ({ label, closable, onClose }) => (
+    <Tag
+      closable={closable}
+      onClose={onClose}
+      style={{ display: 'flex', alignItems: 'center', padding: '4px 8px' }}
+    >
+      {label}
+    </Tag>
+  ),
+);
 
 DefaultTag.displayName = 'DefaultTag';
 

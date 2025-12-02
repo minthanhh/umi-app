@@ -233,7 +233,10 @@ const DynamicPage: React.FC = () => {
   const [selectedTheme, setSelectedTheme] = useState<FormTheme>('default');
   const [activeView, setActiveView] = useState<string>('Form Preview');
 
-  const formConfig = useMemo(() => createFormConfig(selectedTheme), [selectedTheme]);
+  const formConfig = useMemo(
+    () => createFormConfig(selectedTheme),
+    [selectedTheme],
+  );
 
   const handleSubmit = (values: Record<string, unknown>) => {
     console.log('Form values:', values);
@@ -251,8 +254,9 @@ const DynamicPage: React.FC = () => {
           Dynamic Form
         </Title>
         <Paragraph className="text-gray-500">
-          A configurable form component that renders fields based on JSON configuration.
-          Supports multiple field types including infinite scroll select and various themes.
+          A configurable form component that renders fields based on JSON
+          configuration. Supports multiple field types including infinite scroll
+          select and various themes.
         </Paragraph>
       </div>
 

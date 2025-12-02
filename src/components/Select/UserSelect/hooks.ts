@@ -1,17 +1,17 @@
 import { keepPreviousData } from '@tanstack/react-query';
 import { useInfiniteQuery, useQuery } from '@umijs/max';
-import { useMemo, useState, useCallback } from 'react';
 import { isEmpty } from 'lodash';
+import { useCallback, useMemo, useState } from 'react';
 
 import type {
   NormalizedInput,
-  UserDataSource,
-  UserSelectValue,
-  User,
-  PrefilledUser,
   PaginatedResponse,
+  PrefilledUser,
+  User,
+  UserDataSource,
   UserListRequest,
   UserListResponse,
+  UserSelectValue,
 } from './types';
 
 // ============================================================================
@@ -147,7 +147,9 @@ export const useUserList = ({
       return {
         data: response.data,
         nextId:
-          response.data.length < DEFAULT_PAGE_SIZE ? undefined : (pageParam as number) + 1,
+          response.data.length < DEFAULT_PAGE_SIZE
+            ? undefined
+            : (pageParam as number) + 1,
       };
     },
     getNextPageParam: (lastPage: PaginatedResponse<User>) => lastPage.nextId,

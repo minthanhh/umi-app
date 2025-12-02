@@ -6,7 +6,13 @@ import {
   PlusOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { useQuery, useMutation, useQueryClient, history, useParams } from '@umijs/max';
+import {
+  history,
+  useMutation,
+  useParams,
+  useQuery,
+  useQueryClient,
+} from '@umijs/max';
 import {
   Avatar,
   Badge,
@@ -27,7 +33,6 @@ import {
   Space,
   Spin,
   Tag,
-  Timeline,
   Tooltip,
 } from 'antd';
 import React, { useState } from 'react';
@@ -156,7 +161,13 @@ const ProjectDetailPage: React.FC = () => {
   });
 
   const updateTaskMutation = useMutation({
-    mutationFn: async ({ taskId, values }: { taskId: number; values: Partial<TaskFormValues> }) => {
+    mutationFn: async ({
+      taskId,
+      values,
+    }: {
+      taskId: number;
+      values: Partial<TaskFormValues>;
+    }) => {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -176,7 +187,9 @@ const ProjectDetailPage: React.FC = () => {
 
   const deleteTaskMutation = useMutation({
     mutationFn: async (taskId: number) => {
-      const response = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE',
+      });
       return response;
     },
     onSuccess: () => {
@@ -189,7 +202,13 @@ const ProjectDetailPage: React.FC = () => {
   });
 
   const addCommentMutation = useMutation({
-    mutationFn: async ({ taskId, content }: { taskId: number; content: string }) => {
+    mutationFn: async ({
+      taskId,
+      content,
+    }: {
+      taskId: number;
+      content: string;
+    }) => {
       const response = await fetch('/api/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -282,9 +301,13 @@ const ProjectDetailPage: React.FC = () => {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-bold mb-2">{project.name}</h1>
-            <p className="text-gray-500">{project.description || 'No description'}</p>
+            <p className="text-gray-500">
+              {project.description || 'No description'}
+            </p>
           </div>
-          <Tag color={statusColors[project.status] || 'default'}>{project.status}</Tag>
+          <Tag color={statusColors[project.status] || 'default'}>
+            {project.status}
+          </Tag>
         </div>
 
         <Divider />
@@ -314,8 +337,14 @@ const ProjectDetailPage: React.FC = () => {
       </Card>
 
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold m-0">Tasks ({project.tasks.length})</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenTaskModal()}>
+        <h2 className="text-lg font-semibold m-0">
+          Tasks ({project.tasks.length})
+        </h2>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => handleOpenTaskModal()}
+        >
           Add Task
         </Button>
       </div>
@@ -326,7 +355,13 @@ const ProjectDetailPage: React.FC = () => {
             <Card
               title={
                 <Badge
-                  status={statusColors[status] as 'default' | 'processing' | 'success' | 'warning'}
+                  status={
+                    statusColors[status] as
+                      | 'default'
+                      | 'processing'
+                      | 'success'
+                      | 'warning'
+                  }
                   text={status.replace('_', ' ').toUpperCase()}
                   className="font-medium"
                 />
@@ -345,7 +380,10 @@ const ProjectDetailPage: React.FC = () => {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <span className="font-medium text-sm">{task.title}</span>
-                      <Tag color={priorityColors[task.priority]} className="text-xs">
+                      <Tag
+                        color={priorityColors[task.priority]}
+                        className="text-xs"
+                      >
                         {task.priority}
                       </Tag>
                     </div>
@@ -383,7 +421,9 @@ const ProjectDetailPage: React.FC = () => {
         open={isTaskModalOpen}
         onOk={handleSubmitTask}
         onCancel={handleCloseTaskModal}
-        confirmLoading={createTaskMutation.isPending || updateTaskMutation.isPending}
+        confirmLoading={
+          createTaskMutation.isPending || updateTaskMutation.isPending
+        }
       >
         <Form form={form} layout="vertical" className="mt-4">
           <Form.Item
@@ -443,7 +483,10 @@ const ProjectDetailPage: React.FC = () => {
         width={480}
         extra={
           <Space>
-            <Button icon={<EditOutlined />} onClick={() => handleOpenTaskModal(selectedTask!)}>
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => handleOpenTaskModal(selectedTask!)}
+            >
               Edit
             </Button>
             <Popconfirm
@@ -465,10 +508,14 @@ const ProjectDetailPage: React.FC = () => {
           <>
             <Descriptions column={1} className="mb-4">
               <Descriptions.Item label="Status">
-                <Tag color={statusColors[selectedTask.status]}>{selectedTask.status}</Tag>
+                <Tag color={statusColors[selectedTask.status]}>
+                  {selectedTask.status}
+                </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Priority">
-                <Tag color={priorityColors[selectedTask.priority]}>{selectedTask.priority}</Tag>
+                <Tag color={priorityColors[selectedTask.priority]}>
+                  {selectedTask.priority}
+                </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Assignee">
                 {selectedTask.assignee ? (
@@ -496,7 +543,9 @@ const ProjectDetailPage: React.FC = () => {
 
             <Divider />
 
-            <h4 className="font-medium mb-4">Comments ({selectedTask.comments?.length ?? 0})</h4>
+            <h4 className="font-medium mb-4">
+              Comments ({selectedTask.comments?.length ?? 0})
+            </h4>
 
             <List
               dataSource={selectedTask.comments ?? []}
@@ -505,7 +554,9 @@ const ProjectDetailPage: React.FC = () => {
                 <List.Item className="!px-0">
                   <List.Item.Meta
                     avatar={
-                      <Avatar src={comment.author.avatar}>{comment.author.name.charAt(0)}</Avatar>
+                      <Avatar src={comment.author.avatar}>
+                        {comment.author.name.charAt(0)}
+                      </Avatar>
                     }
                     title={
                       <Space>

@@ -3,7 +3,7 @@ import { UmiApiRequest, UmiApiResponse } from '@umijs/max';
 export default async function (req: UmiApiRequest, res: UmiApiResponse) {
   switch (req.method) {
     case 'GET':
-        res.status(200).json({ error: 'Successfully' });
+      res.status(200).json({ error: 'Successfully' });
       break;
 
     default:

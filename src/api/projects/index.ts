@@ -1,5 +1,5 @@
 import { UmiApiRequest, UmiApiResponse } from '@umijs/max';
-import { prisma } from 'lib/prisma';
+import prisma from 'lib/prisma';
 
 export default async function (req: UmiApiRequest, res: UmiApiResponse) {
   switch (req.method) {
@@ -14,7 +14,7 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
         if (ownerId) where.ownerId = parseInt(ownerId as string, 10);
         if (status) where.status = status;
 
-        const [projects, total] = await prisma.$transaction([
+        const [projects, total] = await Promise.all([
           prisma.project.findMany({
             skip,
             take: limit,
@@ -47,7 +47,9 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
         const { name, description, ownerId, status } = req.body;
 
         if (!name || !ownerId) {
-          return res.status(400).json({ error: 'Name and ownerId are required' });
+          return res
+            .status(400)
+            .json({ error: 'Name and ownerId are required' });
         }
 
         const project = await prisma.project.create({

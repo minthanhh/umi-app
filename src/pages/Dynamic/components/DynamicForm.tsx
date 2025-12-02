@@ -1,9 +1,9 @@
-import { Button, Card, Col, Collapse, Form, Row, Space } from 'antd';
 import type { FormInstance } from 'antd';
+import { Button, Card, Col, Collapse, Form, Row, Space } from 'antd';
+import theme from 'antd/es/theme';
 import React, { useMemo } from 'react';
 import type { DynamicFormConfig, FormSection, ThemeConfig } from '../types';
 import DynamicFormField from './DynamicFormField';
-import theme from 'antd/es/theme';
 
 // ============================================================================
 // Types
@@ -73,7 +73,10 @@ interface FormSectionProps {
   index: number;
 }
 
-const FormSectionContent: React.FC<FormSectionProps> = ({ section, themeConfig }) => {
+const FormSectionContent: React.FC<FormSectionProps> = ({
+  section,
+  themeConfig,
+}) => {
   const { fields } = section;
 
   return (
@@ -81,7 +84,12 @@ const FormSectionContent: React.FC<FormSectionProps> = ({ section, themeConfig }
       {fields.map((field) => {
         const colSpan = field.colSpan || 24;
         return (
-          <Col key={field.name} xs={24} sm={colSpan > 12 ? 24 : 12} md={colSpan}>
+          <Col
+            key={field.name}
+            xs={24}
+            sm={colSpan > 12 ? 24 : 12}
+            md={colSpan}
+          >
             <DynamicFormField field={field} size={themeConfig.size} />
           </Col>
         );
@@ -106,7 +114,13 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
   const form = externalForm || internalForm;
   const { token } = theme.useToken();
 
-  const { sections, theme: themeConfig, submitText = 'Submit', resetText = 'Reset', showReset = true } = config;
+  const {
+    sections,
+    theme: themeConfig,
+    submitText = 'Submit',
+    resetText = 'Reset',
+    showReset = true,
+  } = config;
 
   const mergedTheme = useMemo(() => getThemeStyles(themeConfig), [themeConfig]);
 
@@ -129,7 +143,11 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
       return (
         <Space wrap size="middle">
           {allFields.map((field) => (
-            <DynamicFormField key={field.name} field={field} size={mergedTheme.size} />
+            <DynamicFormField
+              key={field.name}
+              field={field}
+              size={mergedTheme.size}
+            />
           ))}
         </Space>
       );
@@ -148,7 +166,11 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
           {section.description && (
             <p className="text-gray-500 text-sm mb-4">{section.description}</p>
           )}
-          <FormSectionContent section={section} themeConfig={mergedTheme} index={index} />
+          <FormSectionContent
+            section={section}
+            themeConfig={mergedTheme}
+            index={index}
+          />
         </Card>
       ));
     }
@@ -162,22 +184,33 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
         {normalSections.map((section, index) => (
           <div key={`normal-${index}`} className="mb-6">
             {section.title && (
-              <h3 className="text-lg font-medium mb-2" style={{ color: token.colorTextHeading }}>
+              <h3
+                className="text-lg font-medium mb-2"
+                style={{ color: token.colorTextHeading }}
+              >
                 {section.title}
               </h3>
             )}
             {section.description && (
-              <p className="text-gray-500 text-sm mb-4">{section.description}</p>
+              <p className="text-gray-500 text-sm mb-4">
+                {section.description}
+              </p>
             )}
-            <FormSectionContent section={section} themeConfig={mergedTheme} index={index} />
+            <FormSectionContent
+              section={section}
+              themeConfig={mergedTheme}
+              index={index}
+            />
           </div>
         ))}
 
         {collapsibleSections.length > 0 && (
           <Collapse
-            defaultActiveKey={collapsibleSections
-              .map((s, i) => (s.defaultCollapsed ? null : `collapse-${i}`))
-              .filter(Boolean) as string[]}
+            defaultActiveKey={
+              collapsibleSections
+                .map((s, i) => (s.defaultCollapsed ? null : `collapse-${i}`))
+                .filter(Boolean) as string[]
+            }
             className="mb-6"
             items={collapsibleSections.map((section, index) => ({
               key: `collapse-${index}`,
@@ -185,9 +218,15 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
               children: (
                 <>
                   {section.description && (
-                    <p className="text-gray-500 text-sm mb-4">{section.description}</p>
+                    <p className="text-gray-500 text-sm mb-4">
+                      {section.description}
+                    </p>
                   )}
-                  <FormSectionContent section={section} themeConfig={mergedTheme} index={index} />
+                  <FormSectionContent
+                    section={section}
+                    themeConfig={mergedTheme}
+                    index={index}
+                  />
                 </>
               ),
             }))}
@@ -198,13 +237,14 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
   };
 
   // Form layout props
-  const formLayoutProps = mergedTheme.theme === 'inline'
-    ? { layout: 'inline' as const }
-    : {
-        labelCol: mergedTheme.labelCol,
-        wrapperCol: mergedTheme.wrapperCol,
-        labelAlign: mergedTheme.labelAlign,
-      };
+  const formLayoutProps =
+    mergedTheme.theme === 'inline'
+      ? { layout: 'inline' as const }
+      : {
+          labelCol: mergedTheme.labelCol,
+          wrapperCol: mergedTheme.wrapperCol,
+          labelAlign: mergedTheme.labelAlign,
+        };
 
   return (
     <Form
@@ -221,7 +261,10 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
         wrapperCol={
           mergedTheme.theme === 'inline'
             ? undefined
-            : { offset: mergedTheme.labelCol?.span || 0, span: mergedTheme.wrapperCol?.span || 24 }
+            : {
+                offset: mergedTheme.labelCol?.span || 0,
+                span: mergedTheme.wrapperCol?.span || 24,
+              }
         }
       >
         <Space>

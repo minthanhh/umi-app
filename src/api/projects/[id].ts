@@ -1,5 +1,5 @@
 import { UmiApiRequest, UmiApiResponse } from '@umijs/max';
-import { prisma } from 'lib/prisma';
+import prisma from 'lib/prisma';
 
 export default async function (req: UmiApiRequest, res: UmiApiResponse) {
   const { id } = req.params;
@@ -33,7 +33,12 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
                 comments: {
                   include: {
                     author: {
-                      select: { id: true, name: true, email: true, avatar: true },
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        avatar: true,
+                      },
                     },
                   },
                   orderBy: { createdAt: 'desc' },

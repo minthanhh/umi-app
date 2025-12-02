@@ -1,5 +1,5 @@
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
-import { useQuery, useMutation, useQueryClient } from '@umijs/max';
+import { useMutation, useQuery, useQueryClient } from '@umijs/max';
 import {
   Avatar,
   Button,
@@ -72,7 +72,13 @@ const UsersPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, values }: { id: number; values: UserFormValues }) => {
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: number;
+      values: UserFormValues;
+    }) => {
       const response = await fetch(`/api/users?id=${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -194,7 +200,11 @@ const UsersPage: React.FC = () => {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold m-0">Users Management</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => handleOpenModal()}
+        >
           Add User
         </Button>
       </div>

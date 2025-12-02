@@ -64,7 +64,9 @@ const BasicLayout: React.FC = () => {
 
   const selectedKey = useMemo(() => {
     const currentPath = location.pathname;
-    const matchedItem = menuItems.find((item) => currentPath.startsWith(item.path));
+    const matchedItem = menuItems.find((item) =>
+      currentPath.startsWith(item.path),
+    );
     return matchedItem?.key || 'home';
   }, [location.pathname]);
 
@@ -85,10 +87,14 @@ const BasicLayout: React.FC = () => {
         theme="light"
       >
         <div className="h-16 flex items-center justify-center border-b border-gray-200">
-          <span className={`font-bold text-xl text-blue-600 ${collapsed ? 'hidden' : ''}`}>
+          <span
+            className={`font-bold text-xl text-blue-600 ${collapsed ? 'hidden' : ''}`}
+          >
             UMI App
           </span>
-          {collapsed && <span className="font-bold text-xl text-blue-600">U</span>}
+          {collapsed && (
+            <span className="font-bold text-xl text-blue-600">U</span>
+          )}
         </div>
         <Menu
           mode="inline"
@@ -105,7 +111,8 @@ const BasicLayout: React.FC = () => {
       <Layout>
         <Header className="bg-white shadow-sm px-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-gray-800 m-0">
-            {menuItems.find((item) => item.key === selectedKey)?.label || 'Dashboard'}
+            {menuItems.find((item) => item.key === selectedKey)?.label ||
+              'Dashboard'}
           </h1>
         </Header>
         <Content className="m-4 p-6 bg-white rounded-lg shadow-sm min-h-[calc(100vh-112px)]">
