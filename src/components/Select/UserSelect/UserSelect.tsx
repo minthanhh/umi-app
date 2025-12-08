@@ -132,7 +132,7 @@ const UserSelect: React.FC<UserSelectProps> = ({
     [dataSources.isFetchingMore],
   );
 
-  console.log('RE-RENDER');
+  const isLoading = dataSources.isHydrating || dataSources.isFetchingMore || dataSources.isInitialLoading;
 
   return (
     <Select
@@ -148,6 +148,8 @@ const UserSelect: React.FC<UserSelectProps> = ({
       onOpenChange={handleOpenChange}
       onPopupScroll={handlePopupScroll}
       popupRender={popupRender}
+      loading={isLoading}
+      maxTagCount={2}
     />
   );
 };

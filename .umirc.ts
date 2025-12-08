@@ -6,6 +6,16 @@ export default defineConfig({
   apiRoute: {
     platform: 'vercel',
   },
+
+  plugins: [
+    require.resolve('./plugins/sw'),
+  ],
+  serviceWorker: {
+    enable: true,
+    swSrc: 'src/service-worker.ts',
+    swDest: 'sw.js',
+  },
+  
   antd: {
     import: true,
     // style: 'css-in-js',
@@ -28,13 +38,11 @@ export default defineConfig({
       legacyTransformer: true,
     },
   },
-  lessLoader: false,
   cssLoader: {},
   access: {},
   model: {},
   initialState: {},
   request: {},
-  plugins: [],
   reactQuery: {
     devtool: true,
     queryClient: true,
@@ -84,10 +92,16 @@ export default defineConfig({
           path: '/dynamic',
           component: './Dynamic',
         },
+        {
+          name: 'Service Worker',
+          path: '/service-worker',
+          component: './ServiceWorker',
+        },
       ],
     },
   ],
 
   npmClient: 'pnpm',
   tailwindcss: {},
+  fastRefresh: true,
 });

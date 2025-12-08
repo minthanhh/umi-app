@@ -56,6 +56,12 @@ const menuItems: MenuItem[] = [
     label: 'Dynamic',
     path: '/dynamic',
   },
+  {
+    key: 'service-worker',
+    icon: <FormOutlined />,
+    label: 'Service Worker',
+    path: '/service-worker',
+  },
 ];
 
 const BasicLayout: React.FC = () => {
