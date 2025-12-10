@@ -2,7 +2,11 @@ import { SelectWrapper } from '@/components/Select/DefaultSelect';
 import { Select, Tag } from 'antd';
 import React from 'react';
 import { tasksApi } from '../api';
-import { DEFAULT_PAGE_SIZE, PRIORITY_COLORS, STATUS_LABELS } from '../constants';
+import {
+  DEFAULT_PAGE_SIZE,
+  PRIORITY_COLORS,
+  STATUS_LABELS,
+} from '../constants';
 import type { SelectMode, Task } from '../types';
 
 interface TaskSelectProps {
@@ -26,7 +30,9 @@ const TaskOptionLabel: React.FC<{ task: Task; showProject?: boolean }> = ({
           {task.project.name}
         </Tag>
       )}
-      <span style={{ color: PRIORITY_COLORS[task.priority] }}>{task.priority}</span>
+      <span style={{ color: PRIORITY_COLORS[task.priority] }}>
+        {task.priority}
+      </span>
       {' • '}
       {STATUS_LABELS[task.status] ?? task.status}
       {!showProject && task.assignee && ` • ${task.assignee.name}`}
@@ -58,7 +64,8 @@ export const TaskSelect: React.FC<TaskSelectProps> = ({
       config={{
         queryKey,
         fetchList: (request) => {
-          if (projectIds.length === 0) return Promise.resolve({ data: [], total: 0 });
+          if (projectIds.length === 0)
+            return Promise.resolve({ data: [], total: 0 });
           return tasksApi.fetchByProjects(projectIds, request);
         },
         fetchByIds: tasksApi.fetchByIds,

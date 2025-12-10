@@ -9,7 +9,12 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
 
   const { id } = req.params;
   const projectId = parseInt(id as string, 10);
-  const { name, ownerId, includeTasks = true, includeMembers = true } = req.body;
+  const {
+    name,
+    ownerId,
+    includeTasks = true,
+    includeMembers = true,
+  } = req.body;
 
   if (isNaN(projectId)) {
     return res.status(400).json({ error: 'Invalid project ID' });
@@ -48,7 +53,9 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    const newOwnerId = ownerId ? parseInt(ownerId, 10) : originalProject.ownerId;
+    const newOwnerId = ownerId
+      ? parseInt(ownerId, 10)
+      : originalProject.ownerId;
     const newProjectName = name || `${originalProject.name} (Copy)`;
 
     // Create new project
@@ -62,7 +69,11 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
     });
 
     // Clone members if requested
-    if (includeMembers && originalProject.members && originalProject.members.length > 0) {
+    if (
+      includeMembers &&
+      originalProject.members &&
+      originalProject.members.length > 0
+    ) {
       const membersToCreate = originalProject.members.map((member) => ({
         userId: member.userId,
         projectId: newProject.id,
@@ -70,7 +81,9 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
       }));
 
       // Check if new owner is already in members list
-      const ownerInMembers = membersToCreate.some((m) => m.userId === newOwnerId);
+      const ownerInMembers = membersToCreate.some(
+        (m) => m.userId === newOwnerId,
+      );
       if (!ownerInMembers) {
         membersToCreate.push({
           userId: newOwnerId,
@@ -95,7 +108,11 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
     }
 
     // Clone tasks if requested
-    if (includeTasks && originalProject.tasks && originalProject.tasks.length > 0) {
+    if (
+      includeTasks &&
+      originalProject.tasks &&
+      originalProject.tasks.length > 0
+    ) {
       const tasksToCreate = originalProject.tasks.map((task) => ({
         title: task.title,
         description: task.description,

@@ -18,7 +18,8 @@ const ProjectOptionLabel: React.FC<{ project: Project }> = ({ project }) => (
   <div>
     <div style={{ fontWeight: 500 }}>{project.name}</div>
     <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>
-      {project._count?.tasks ?? 0} tasks • {project._count?.members ?? 0} members
+      {project._count?.tasks ?? 0} tasks • {project._count?.members ?? 0}{' '}
+      members
     </div>
   </div>
 );

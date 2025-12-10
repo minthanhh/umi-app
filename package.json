@@ -14,6 +14,7 @@
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "@ant-design/pro-components": "^2.8.10",
+    "@hookform/resolvers": "^5.2.2",
     "@prisma/adapter-pg": "^7.0.1",
     "@prisma/client": "^7.0.1",
     "@tanstack/react-query": "^5.90.11",
@@ -21,12 +22,16 @@
     "antd": "^6.0.0",
     "dayjs": "^1.11.13",
     "dotenv": "^17.2.3",
+    "formik": "^2.4.9",
     "fs-extra": "^11.3.2",
     "lodash": "^4.17.21",
     "mockjs": "^1.1.0",
     "prisma": "^7.0.1",
+    "react-hook-form": "^7.68.0",
     "tsx": "^4.20.6",
-    "umi-app": "link:"
+    "umi-app": "link:",
+    "yup": "^1.7.1",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

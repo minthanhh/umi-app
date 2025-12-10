@@ -7,7 +7,14 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { projectIds = [], current = 1, pageSize = 10, ids = [], status, priority } = req.body;
+  const {
+    projectIds = [],
+    current = 1,
+    pageSize = 10,
+    ids = [],
+    status,
+    priority,
+  } = req.body;
 
   try {
     const page = parseInt(current as string, 10);

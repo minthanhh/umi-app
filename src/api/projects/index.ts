@@ -5,7 +5,12 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
   switch (req.method) {
     case 'GET':
       try {
-        const { current = '1', pageSize = '10', ownerId, ownerIds = [] } = req.query;
+        const {
+          current = '1',
+          pageSize = '10',
+          ownerId,
+          ownerIds = [],
+        } = req.query;
         const page = parseInt(current as string, 10);
         const limit = parseInt(pageSize as string, 10);
         const skip = (page - 1) * limit;
@@ -43,7 +48,17 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
 
     case 'POST':
       try {
-        const { action, name, description, ownerId, status, memberIds = [], ids = [], current = 1, pageSize = 10 } = req.body;
+        const {
+          action,
+          name,
+          description,
+          ownerId,
+          status,
+          memberIds = [],
+          ids = [],
+          current = 1,
+          pageSize = 10,
+        } = req.body;
 
         // Action: Get projects by member IDs
         if (action === 'by-members') {
@@ -62,7 +77,9 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
             whereClause = {
               members: {
                 some: {
-                  userId: { in: memberIds.map((id: string | number) => Number(id)) },
+                  userId: {
+                    in: memberIds.map((id: string | number) => Number(id)),
+                  },
                 },
               },
             };

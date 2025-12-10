@@ -179,7 +179,13 @@ const ProjectsPage: React.FC = () => {
   });
 
   const cloneMutation = useMutation({
-    mutationFn: async ({ id, values }: { id: number; values: CloneFormValues }) => {
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: number;
+      values: CloneFormValues;
+    }) => {
       const response = await fetch(`/api/projects/${id}/clone`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -289,7 +295,9 @@ const ProjectsPage: React.FC = () => {
                     actions={[
                       <Tooltip title="View Details" key="view">
                         <EyeOutlined
-                          onClick={() => history.push(`/projects/${project.id}`)}
+                          onClick={() =>
+                            history.push(`/projects/${project.id}`)
+                          }
                         />
                       </Tooltip>,
                       <Tooltip title="Clone Project" key="clone">
@@ -361,7 +369,8 @@ const ProjectsPage: React.FC = () => {
                             color={statusConfig[project.status]?.color}
                             style={{ flexShrink: 0 }}
                           >
-                            {statusConfig[project.status]?.label || project.status}
+                            {statusConfig[project.status]?.label ||
+                              project.status}
                           </Tag>
                         </div>
                       }
@@ -390,12 +399,16 @@ const ProjectsPage: React.FC = () => {
                         <Tooltip title="Team Members">
                           <Space size={4}>
                             <TeamOutlined style={{ color: '#1890ff' }} />
-                            <Text type="secondary">{project._count.members}</Text>
+                            <Text type="secondary">
+                              {project._count.members}
+                            </Text>
                           </Space>
                         </Tooltip>
                         <Tooltip title="Tasks">
                           <Space size={4}>
-                            <UnorderedListOutlined style={{ color: '#52c41a' }} />
+                            <UnorderedListOutlined
+                              style={{ color: '#52c41a' }}
+                            />
                             <Text type="secondary">{project._count.tasks}</Text>
                           </Space>
                         </Tooltip>
@@ -412,7 +425,9 @@ const ProjectsPage: React.FC = () => {
                           }
                           size="small"
                           status={
-                            project.status === 'completed' ? 'success' : 'active'
+                            project.status === 'completed'
+                              ? 'success'
+                              : 'active'
                           }
                         />
                       </div>

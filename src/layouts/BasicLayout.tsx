@@ -62,6 +62,24 @@ const menuItems: MenuItem[] = [
     label: 'Service Worker',
     path: '/service-worker',
   },
+  {
+    key: 'formik',
+    icon: <FormOutlined />,
+    label: 'Formik Demo',
+    path: '/formik',
+  },
+  {
+    key: 'rhf',
+    icon: <FormOutlined />,
+    label: 'RHF Demo',
+    path: '/rhf',
+  },
+  {
+    key: 'dependent-field',
+    icon: <FormOutlined />,
+    label: 'Dependent Field',
+    path: '/dependent-field',
+  }
 ];
 
 const BasicLayout: React.FC = () => {

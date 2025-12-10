@@ -13,7 +13,15 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { useMutation } from '@umijs/max';
-import { Avatar, Button, message, Popconfirm, Space, Tag, Typography } from 'antd';
+import {
+  Avatar,
+  Button,
+  message,
+  Popconfirm,
+  Space,
+  Tag,
+  Typography,
+} from 'antd';
 import React, { useRef, useState } from 'react';
 
 const { Text } = Typography;
@@ -60,7 +68,13 @@ const UsersPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, values }: { id: number; values: UserFormValues }) => {
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: number;
+      values: UserFormValues;
+    }) => {
       const response = await fetch(`/api/users?id=${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -272,7 +286,8 @@ const UsersPage: React.FC = () => {
                   title="Delete User"
                   description={
                     <div>
-                      Are you sure you want to delete <strong>{record.name}</strong>?
+                      Are you sure you want to delete{' '}
+                      <strong>{record.name}</strong>?
                       <br />
                       <Text type="secondary" style={{ fontSize: 12 }}>
                         This action cannot be undone.
@@ -304,7 +319,11 @@ const UsersPage: React.FC = () => {
           setModalOpen(open);
           if (!open) setEditingUser(null);
         }}
-        initialValues={editingUser ? { name: editingUser.name, email: editingUser.email } : {}}
+        initialValues={
+          editingUser
+            ? { name: editingUser.name, email: editingUser.email }
+            : {}
+        }
         onFinish={handleSubmit}
         modalProps={{
           destroyOnClose: true,

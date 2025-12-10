@@ -1,5 +1,5 @@
 import { LoadingOutlined } from '@ant-design/icons';
-import { Spin, Tag, Avatar } from 'antd';
+import { Avatar, Spin, Tag } from 'antd';
 import { memo } from 'react';
 
 import type { UserDropdownItemProps, UserSelectedItemProps } from './types';

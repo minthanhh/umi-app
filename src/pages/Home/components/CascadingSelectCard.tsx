@@ -84,7 +84,9 @@ const SelectedValuesDisplay: React.FC<SelectedValuesDisplayProps> = ({
   );
 };
 
-export const CascadingSelectCard: React.FC<CascadingSelectCardProps> = ({ mode }) => {
+export const CascadingSelectCard: React.FC<CascadingSelectCardProps> = ({
+  mode,
+}) => {
   const [form] = Form.useForm();
   const isMultiple = mode === 'multiple';
 
@@ -114,7 +116,9 @@ export const CascadingSelectCard: React.FC<CascadingSelectCardProps> = ({ mode }
       }
 
       // Multiple mode: smart cascade
-      const removedMemberIds = memberIds.filter((id) => !newMemberIds.includes(id));
+      const removedMemberIds = memberIds.filter(
+        (id) => !newMemberIds.includes(id),
+      );
 
       if (removedMemberIds.length > 0) {
         // Find projects that belong to removed members and should be removed
@@ -130,7 +134,9 @@ export const CascadingSelectCard: React.FC<CascadingSelectCardProps> = ({ mode }
         });
 
         // Filter out removed projects
-        const newProjectIds = projectIds.filter((id) => !projectsToRemove.includes(id));
+        const newProjectIds = projectIds.filter(
+          (id) => !projectsToRemove.includes(id),
+        );
 
         // Find tasks that belong to removed projects
         const tasksToRemove: number[] = [];
@@ -175,7 +181,9 @@ export const CascadingSelectCard: React.FC<CascadingSelectCardProps> = ({ mode }
       }
 
       // Multiple mode: smart cascade
-      const removedProjectIds = projectIds.filter((id) => !newProjectIds.includes(id));
+      const removedProjectIds = projectIds.filter(
+        (id) => !newProjectIds.includes(id),
+      );
 
       // Update project-member map with new selections
       if (selectedProjects) {

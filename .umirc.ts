@@ -14,6 +14,14 @@ export default defineConfig({
     swDest: 'sw.js',
   },
 
+  headScripts: [],
+  scripts: [
+    {
+      src: '//unpkg.com/react-scan/dist/auto.global.js',
+      crossOrigin: 'anonymous',
+    },
+  ],
+
   antd: {
     import: true,
     // style: 'css-in-js',
@@ -94,6 +102,21 @@ export default defineConfig({
           name: 'Service Worker',
           path: '/service-worker',
           component: './ServiceWorker',
+        },
+        {
+          name: 'Formik Demo',
+          path: '/formik',
+          component: './FormikDemo',
+        },
+        {
+          name: 'RHF Demo',
+          path: '/rhf',
+          component: './RHFDemo',
+        },
+        {
+          name: 'Dependent Field',
+          path: '/dependent-field',
+          component: './DependentFieldDemo',
         },
       ],
     },

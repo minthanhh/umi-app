@@ -27,7 +27,7 @@ function SelectWrapperInner<T extends BaseItem>({
   onChange,
   children,
 }: SelectWrapperProps<T>) {
-  console.log(value)
+  console.log(value);
   // Get item ID helper
   const getItemId = config.getItemId ?? ((item: T) => item.id);
 
