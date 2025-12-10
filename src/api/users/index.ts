@@ -4,6 +4,46 @@ import prisma from 'lib/prisma';
 export default async function (req: UmiApiRequest, res: UmiApiResponse) {
   switch (req.method) {
     case 'POST': {
+      const { action, name, email, avatar } = req.body;
+
+      // Create new user
+      if (action === 'create') {
+        if (!name || !email) {
+          return res.status(400).json({ error: 'Name and email are required' });
+        }
+
+        try {
+          const existingUser = await prisma.user.findFirst({
+            where: {
+              OR: [{ email }, { name }],
+            },
+          });
+
+          if (existingUser) {
+            return res.status(400).json({
+              error:
+                existingUser.email === email
+                  ? 'Email already exists'
+                  : 'Name already exists',
+            });
+          }
+
+          const newUser = await prisma.user.create({
+            data: {
+              name,
+              email,
+              avatar: avatar || null,
+            },
+          });
+
+          return res.status(201).json({ data: newUser, success: true });
+        } catch (error) {
+          console.error(error);
+          return res.status(500).json({ error: 'Failed to create user' });
+        }
+      }
+
+      // List users (default action)
       const { current = '1', pageSize = '10', sorter, ids = [] } = req.body;
       const page = parseInt(current as string, 10);
       const limit = parseInt(pageSize as string, 10);

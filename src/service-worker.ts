@@ -14,7 +14,10 @@ function isSameOrigin(url: string): boolean {
 }
 
 // Cache-first strategy for same-origin requests
-async function cacheFirst(request: Request, cacheName: string): Promise<Response> {
+async function cacheFirst(
+  request: Request,
+  cacheName: string,
+): Promise<Response> {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 
@@ -36,7 +39,10 @@ async function cacheFirst(request: Request, cacheName: string): Promise<Response
 }
 
 // Cache-first strategy for cross-origin requests (images, etc.)
-async function cacheFirstCrossOrigin(request: Request, cacheName: string): Promise<Response> {
+async function cacheFirstCrossOrigin(
+  request: Request,
+  cacheName: string,
+): Promise<Response> {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 

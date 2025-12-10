@@ -15,7 +15,7 @@ export const UserDropdownItem = memo<UserDropdownItemProps>(
       <Avatar
         shape="square"
         size="large"
-        src={item.avatar}
+        src={item?.avatar}
         className={isPinned ? 'border-2 border-blue-500' : ''}
       />
       <div className="flex flex-col flex-1 overflow-hidden">
@@ -25,7 +25,7 @@ export const UserDropdownItem = memo<UserDropdownItemProps>(
               isPinned ? 'text-blue-700' : 'text-gray-700'
             }`}
           >
-            {item.email}
+            {item?.email}
           </span>
           {isPinned && (
             <Tag color="blue" className="mr-0">
@@ -33,7 +33,7 @@ export const UserDropdownItem = memo<UserDropdownItemProps>(
             </Tag>
           )}
         </div>
-        <span className="text-gray-500 text-xs truncate">{item.name}</span>
+        <span className="text-gray-500 text-xs truncate">{item?.name}</span>
       </div>
     </div>
   ),
@@ -51,7 +51,7 @@ export const UserSelectedItem = memo<UserSelectedItemProps>(
     <div className="flex items-center gap-2 h-full w-full -ml-1">
       <Avatar
         size="small"
-        src={item.avatar}
+        src={item?.avatar}
         className={isPinned ? 'border border-blue-500' : ''}
       />
       <div className="flex flex-col justify-center h-full leading-tight">
@@ -60,7 +60,7 @@ export const UserSelectedItem = memo<UserSelectedItemProps>(
             isPinned ? 'text-blue-700' : 'text-gray-800'
           }`}
         >
-          {item.email}
+          {item?.email}
         </span>
       </div>
     </div>

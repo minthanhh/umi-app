@@ -132,7 +132,10 @@ const UserSelect: React.FC<UserSelectProps> = ({
     [dataSources.isFetchingMore],
   );
 
-  const isLoading = dataSources.isHydrating || dataSources.isFetchingMore || dataSources.isInitialLoading;
+  const isLoading =
+    dataSources.isHydrating ||
+    dataSources.isFetchingMore ||
+    dataSources.isInitialLoading;
 
   return (
     <Select

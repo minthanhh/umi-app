@@ -36,7 +36,9 @@ UserDropdownItem.displayName = 'UserDropdownItem';
 const UserSelectedItem = memo<{ user: User }>(({ user }) => (
   <div className="flex items-center gap-2 h-full w-full -ml-1">
     <Avatar size="small" src={user.avatar} />
-    <span className="text-sm font-semibold truncate text-gray-800">{user.email}</span>
+    <span className="text-sm font-semibold truncate text-gray-800">
+      {user.email}
+    </span>
   </div>
 ));
 
@@ -101,7 +103,12 @@ interface AntdUserSelectInnerProps {
 }
 
 const AntdUserSelectInner = memo<AntdUserSelectInnerProps>(
-  ({ placeholder = 'Select users', disabled = false, style, maxTagCount = 2 }) => {
+  ({
+    placeholder = 'Select users',
+    disabled = false,
+    style,
+    maxTagCount = 2,
+  }) => {
     const { state, actions } = useSelectContext<User>();
 
     // Convert options to Antd format
@@ -128,10 +135,14 @@ const AntdUserSelectInner = memo<AntdUserSelectInnerProps>(
         const isRawId = label === value;
 
         if (isRawId && state.isHydrating) {
-          return <LoadingTag value={value} closable={closable} onClose={onClose} />;
+          return (
+            <LoadingTag value={value} closable={closable} onClose={onClose} />
+          );
         }
 
-        return <DefaultTag label={label} closable={closable} onClose={onClose} />;
+        return (
+          <DefaultTag label={label} closable={closable} onClose={onClose} />
+        );
       },
       [state.isHydrating],
     );
@@ -147,7 +158,8 @@ const AntdUserSelectInner = memo<AntdUserSelectInnerProps>(
       [state.isFetchingMore],
     );
 
-    const isLoading = state.isLoading || state.isHydrating || state.isFetchingMore;
+    const isLoading =
+      state.isLoading || state.isHydrating || state.isFetchingMore;
 
     return (
       <Select
@@ -246,7 +258,13 @@ AntdUserSelect.displayName = 'AntdUserSelect';
 // ============================================================================
 
 export const AntdUserSelectWithRenderProps = memo<AntdUserSelectProps>(
-  ({ value, onChange, placeholder = 'Select users', disabled, style = { width: 300 } }) => {
+  ({
+    value,
+    onChange,
+    placeholder = 'Select users',
+    disabled,
+    style = { width: 300 },
+  }) => {
     const config = useMemo(() => createUserSelectConfig(), []);
 
     return (

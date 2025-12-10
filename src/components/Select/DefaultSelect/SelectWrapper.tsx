@@ -10,9 +10,9 @@ import {
 } from './hooks';
 import type {
   BaseItem,
+  SelectActions,
   SelectContext,
   SelectState,
-  SelectActions,
   SelectWrapperProps,
 } from './types';
 
@@ -27,6 +27,7 @@ function SelectWrapperInner<T extends BaseItem>({
   onChange,
   children,
 }: SelectWrapperProps<T>) {
+  console.log(value)
   // Get item ID helper
   const getItemId = config.getItemId ?? ((item: T) => item.id);
 
@@ -114,7 +115,13 @@ function SelectWrapperInner<T extends BaseItem>({
       fetchNextPage: dataSource.fetchNextPage,
       refresh,
     }),
-    [handleChange, handleOpenChange, handleScroll, dataSource.fetchNextPage, refresh],
+    [
+      handleChange,
+      handleOpenChange,
+      handleScroll,
+      dataSource.fetchNextPage,
+      refresh,
+    ],
   );
 
   // Build context value
@@ -128,10 +135,13 @@ function SelectWrapperInner<T extends BaseItem>({
   );
 
   // Render children (support both render prop and regular children)
-  const content = typeof children === 'function' ? children(contextValue) : children;
+  const content =
+    typeof children === 'function' ? children(contextValue) : children;
 
   return <SelectProvider value={contextValue}>{content}</SelectProvider>;
 }
 
 // Memoize the component
-export const SelectWrapper = memo(SelectWrapperInner) as typeof SelectWrapperInner;
+export const SelectWrapper = memo(
+  SelectWrapperInner,
+) as typeof SelectWrapperInner;

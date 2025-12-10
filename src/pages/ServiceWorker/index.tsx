@@ -1,3 +1,15 @@
+import { useServiceWorker } from '@/hooks/useServiceWorker';
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  CloudDownloadOutlined,
+  CloudSyncOutlined,
+  DatabaseOutlined,
+  DeleteOutlined,
+  ExclamationCircleOutlined,
+  ReloadOutlined,
+  SyncOutlined,
+} from '@ant-design/icons';
 import {
   Alert,
   Badge,
@@ -16,24 +28,20 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import {
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  CloudDownloadOutlined,
-  CloudSyncOutlined,
-  DatabaseOutlined,
-  DeleteOutlined,
-  ExclamationCircleOutlined,
-  ReloadOutlined,
-  SyncOutlined,
-} from '@ant-design/icons';
-import { useServiceWorker } from '@/hooks/useServiceWorker';
 
 const { Title, Text, Paragraph } = Typography;
 
 export default function ServiceWorkerPage() {
-  const { status, caches, isLoading, update, unregister, skipWaiting, clearCache, refreshCaches } =
-    useServiceWorker();
+  const {
+    status,
+    caches,
+    isLoading,
+    update,
+    unregister,
+    skipWaiting,
+    clearCache,
+    refreshCaches,
+  } = useServiceWorker();
 
   const handleUpdate = async () => {
     message.loading({ content: 'Checking for updates...', key: 'sw-update' });
@@ -73,7 +81,9 @@ export default function ServiceWorkerPage() {
       cancelText: 'Cancel',
       onOk: async () => {
         await clearCache(cacheName);
-        message.success(cacheName ? `Cache "${cacheName}" cleared` : 'All caches cleared');
+        message.success(
+          cacheName ? `Cache "${cacheName}" cleared` : 'All caches cleared',
+        );
       },
     });
   };
@@ -108,7 +118,9 @@ export default function ServiceWorkerPage() {
     return (
       <div style={{ textAlign: 'center', padding: 100 }}>
         <Spin size="large" />
-        <Paragraph style={{ marginTop: 16 }}>Loading Service Worker status...</Paragraph>
+        <Paragraph style={{ marginTop: 16 }}>
+          Loading Service Worker status...
+        </Paragraph>
       </div>
     );
   }
@@ -121,7 +133,8 @@ export default function ServiceWorkerPage() {
       </Title>
 
       <Paragraph type="secondary">
-        Manage your application&apos;s Service Worker and cache storage for offline functionality.
+        Manage your application&apos;s Service Worker and cache storage for
+        offline functionality.
       </Paragraph>
 
       {!status.isSupported && (
@@ -167,7 +180,14 @@ export default function ServiceWorkerPage() {
               value={getStatusText()}
               prefix={
                 <Badge
-                  status={getStatusColor() as 'default' | 'success' | 'error' | 'warning' | 'processing'}
+                  status={
+                    getStatusColor() as
+                      | 'default'
+                      | 'success'
+                      | 'error'
+                      | 'warning'
+                      | 'processing'
+                  }
                 />
               }
             />
@@ -216,7 +236,11 @@ export default function ServiceWorkerPage() {
             title="Service Worker Details"
             extra={
               <Space>
-                <Button icon={<ReloadOutlined />} onClick={handleUpdate} disabled={!status.isRegistered}>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={handleUpdate}
+                  disabled={!status.isRegistered}
+                >
                   Check Updates
                 </Button>
               </Space>
@@ -310,7 +334,11 @@ export default function ServiceWorkerPage() {
                     ]}
                   >
                     <List.Item.Meta
-                      avatar={<DatabaseOutlined style={{ fontSize: 24, color: '#1890ff' }} />}
+                      avatar={
+                        <DatabaseOutlined
+                          style={{ fontSize: 24, color: '#1890ff' }}
+                        />
+                      }
                       title={<Text strong>{cache.name}</Text>}
                       description={`${cache.count} cached items`}
                     />
@@ -361,21 +389,25 @@ export default function ServiceWorkerPage() {
 
       <Card title="About Service Workers" style={{ marginTop: 16 }}>
         <Paragraph>
-          Service Workers are scripts that run in the background, separate from your web page. They
-          enable features like:
+          Service Workers are scripts that run in the background, separate from
+          your web page. They enable features like:
         </Paragraph>
         <ul>
           <li>
-            <Text strong>Offline Support:</Text> Cache resources to work without internet
+            <Text strong>Offline Support:</Text> Cache resources to work without
+            internet
           </li>
           <li>
-            <Text strong>Background Sync:</Text> Sync data when connectivity is restored
+            <Text strong>Background Sync:</Text> Sync data when connectivity is
+            restored
           </li>
           <li>
-            <Text strong>Push Notifications:</Text> Receive notifications even when the app is closed
+            <Text strong>Push Notifications:</Text> Receive notifications even
+            when the app is closed
           </li>
           <li>
-            <Text strong>Performance:</Text> Faster load times through intelligent caching
+            <Text strong>Performance:</Text> Faster load times through
+            intelligent caching
           </li>
         </ul>
       </Card>

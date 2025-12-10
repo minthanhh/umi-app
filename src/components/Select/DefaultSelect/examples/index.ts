@@ -1,3 +1,6 @@
 // Example implementations using SelectWrapper
 
-export { AntdUserSelect, AntdUserSelectWithRenderProps } from './AntdSelectExample';
+export {
+  AntdUserSelect,
+  AntdUserSelectWithRenderProps,
+} from './AntdSelectExample';

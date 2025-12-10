@@ -59,11 +59,14 @@ export function useNormalizedInput<T extends BaseItem>(
 // Manages dropdown open/close state and lazy loading trigger
 // ============================================================================
 
-export function useDropdownState(fetchStrategy: FetchStrategy = 'lazy'): DropdownState {
+export function useDropdownState(
+  fetchStrategy: FetchStrategy = 'lazy',
+): DropdownState {
   const [isOpen, setIsOpen] = useState(false);
   const [hasOpenedOnce, setHasOpenedOnce] = useState(false);
 
-  const isListFetchEnabled = fetchStrategy === 'eager' ? true : isOpen || hasOpenedOnce;
+  const isListFetchEnabled =
+    fetchStrategy === 'eager' ? true : isOpen || hasOpenedOnce;
 
   const handleOpenChange = useCallback((open: boolean) => {
     setIsOpen(open);
@@ -217,7 +220,11 @@ export function useDataSource<T extends BaseItem>({
   // Merge all data sources, deduplicated by ID
   const items = useMemo(() => {
     const getItemId = config.getItemId ?? ((item: T) => item.id);
-    const allItems = [...prefilledItems, ...hydration.hydratedData, ...list.listData];
+    const allItems = [
+      ...prefilledItems,
+      ...hydration.hydratedData,
+      ...list.listData,
+    ];
     const uniqueMap = new Map<string | number, T>();
 
     allItems.forEach((item) => {
@@ -288,7 +295,8 @@ export function useScrollHandler({
     (e: React.UIEvent<HTMLElement>) => {
       const target = e.target as HTMLElement;
       const isNearBottom =
-        target.scrollTop + target.offsetHeight >= target.scrollHeight - threshold;
+        target.scrollTop + target.offsetHeight >=
+        target.scrollHeight - threshold;
 
       if (isNearBottom && hasNextPage && !isFetchingMore) {
         fetchNextPage();

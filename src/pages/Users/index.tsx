@@ -1,20 +1,22 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
-import { useMutation, useQuery, useQueryClient } from '@umijs/max';
 import {
-  Avatar,
-  Button,
-  Card,
-  Form,
-  Input,
-  message,
-  Modal,
-  Popconfirm,
-  Space,
-  Table,
-  Tag,
-} from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import React, { useState } from 'react';
+  DeleteOutlined,
+  EditOutlined,
+  MailOutlined,
+  PlusOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
+import {
+  ActionType,
+  ModalForm,
+  PageContainer,
+  ProFormText,
+  ProTable,
+} from '@ant-design/pro-components';
+import { useMutation } from '@umijs/max';
+import { Avatar, Button, message, Popconfirm, Space, Tag, Typography } from 'antd';
+import React, { useRef, useState } from 'react';
+
+const { Text } = Typography;
 
 interface User {
   id: number;
@@ -34,23 +36,9 @@ interface UserFormValues {
 }
 
 const UsersPage: React.FC = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const actionRef = useRef<ActionType>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [form] = Form.useForm<UserFormValues>();
-  const queryClient = useQueryClient();
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: async () => {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ current: 1, pageSize: 100 }),
-      });
-      const result = await response.json();
-      return result.data as User[];
-    },
-  });
 
   const createMutation = useMutation({
     mutationFn: async (values: UserFormValues) => {
@@ -59,12 +47,12 @@ const UsersPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...values, action: 'create' }),
       });
+      if (!response.ok) throw new Error('Failed to create user');
       return response.json();
     },
     onSuccess: () => {
       message.success('User created successfully');
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      handleCloseModal();
+      actionRef.current?.reload();
     },
     onError: () => {
       message.error('Failed to create user');
@@ -72,24 +60,18 @@ const UsersPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({
-      id,
-      values,
-    }: {
-      id: number;
-      values: UserFormValues;
-    }) => {
+    mutationFn: async ({ id, values }: { id: number; values: UserFormValues }) => {
       const response = await fetch(`/api/users?id=${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       });
+      if (!response.ok) throw new Error('Failed to update user');
       return response.json();
     },
     onSuccess: () => {
       message.success('User updated successfully');
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      handleCloseModal();
+      actionRef.current?.reload();
     },
     onError: () => {
       message.error('Failed to update user');
@@ -101,11 +83,12 @@ const UsersPage: React.FC = () => {
       const response = await fetch(`/api/users?id=${id}`, {
         method: 'DELETE',
       });
+      if (!response.ok) throw new Error('Failed to delete user');
       return response;
     },
     onSuccess: () => {
       message.success('User deleted successfully');
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      actionRef.current?.reload();
     },
     onError: () => {
       message.error('Failed to delete user');
@@ -113,140 +96,255 @@ const UsersPage: React.FC = () => {
   });
 
   const handleOpenModal = (user?: User) => {
-    if (user) {
-      setEditingUser(user);
-      form.setFieldsValue({ name: user.name, email: user.email });
-    } else {
-      setEditingUser(null);
-      form.resetFields();
-    }
-    setIsModalOpen(true);
+    setEditingUser(user || null);
+    setModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingUser(null);
-    form.resetFields();
-  };
-
-  const handleSubmit = async () => {
-    const values = await form.validateFields();
+  const handleSubmit = async (values: UserFormValues) => {
     if (editingUser) {
-      updateMutation.mutate({ id: editingUser.id, values });
+      await updateMutation.mutateAsync({ id: editingUser.id, values });
     } else {
-      createMutation.mutate(values);
+      await createMutation.mutateAsync(values);
     }
+    setModalOpen(false);
+    setEditingUser(null);
+    return true;
   };
-
-  const columns: ColumnsType<User> = [
-    {
-      title: 'User',
-      key: 'user',
-      render: (_, record) => (
-        <Space>
-          <Avatar src={record.avatar} size="large">
-            {record.name.charAt(0)}
-          </Avatar>
-          <div>
-            <div className="font-semibold">{record.name}</div>
-            <div className="text-gray-500 text-sm">{record.email}</div>
-          </div>
-        </Space>
-      ),
-    },
-    {
-      title: 'Projects',
-      dataIndex: ['_count', 'ownedProjects'],
-      key: 'projects',
-      render: (count) => <Tag color="blue">{count || 0} owned</Tag>,
-    },
-    {
-      title: 'Tasks',
-      dataIndex: ['_count', 'assignedTasks'],
-      key: 'tasks',
-      render: (count) => <Tag color="green">{count || 0} assigned</Tag>,
-    },
-    {
-      title: 'Created',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date) => new Date(date).toLocaleDateString(),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => handleOpenModal(record)}
-          />
-          <Popconfirm
-            title="Delete user"
-            description="Are you sure you want to delete this user?"
-            onConfirm={() => deleteMutation.mutate(record.id)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Button type="text" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold m-0">Users Management</h2>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => handleOpenModal()}
-        >
-          Add User
-        </Button>
-      </div>
+    <PageContainer
+      header={{
+        title: 'Users Management',
+        subTitle: 'Manage all users in your system',
+      }}
+    >
+      <ProTable<User>
+        actionRef={actionRef}
+        rowKey="id"
+        headerTitle="Users List"
+        cardBordered
+        request={async (params) => {
+          const { current = 1, pageSize = 10, name, email } = params;
+          const response = await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              current,
+              pageSize,
+              name,
+              email,
+              sorter: { createdAt: 'desc' },
+            }),
+          });
+          const result = await response.json();
+          return {
+            data: result.data,
+            total: result.total,
+            success: true,
+          };
+        }}
+        pagination={{
+          defaultPageSize: 10,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          pageSizeOptions: [5, 10, 20, 50],
+        }}
+        search={{
+          labelWidth: 'auto',
+          filterType: 'light',
+        }}
+        toolBarRender={() => [
+          <Button
+            key="add"
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => handleOpenModal()}
+          >
+            Add User
+          </Button>,
+        ]}
+        columns={[
+          {
+            title: 'User',
+            dataIndex: 'name',
+            key: 'user',
+            width: 280,
+            render: (_, record) => (
+              <Space size="middle">
+                <Avatar
+                  src={record.avatar}
+                  size={48}
+                  icon={<UserOutlined />}
+                  style={{
+                    backgroundColor: record.avatar ? undefined : '#1890ff',
+                    flexShrink: 0,
+                  }}
+                >
+                  {!record.avatar && record.name?.charAt(0).toUpperCase()}
+                </Avatar>
+                <div>
+                  <Text strong style={{ fontSize: 15, display: 'block' }}>
+                    {record.name}
+                  </Text>
+                  <Text type="secondary" style={{ fontSize: 13 }}>
+                    <MailOutlined style={{ marginRight: 4 }} />
+                    {record.email}
+                  </Text>
+                </div>
+              </Space>
+            ),
+          },
+          {
+            title: 'Email',
+            dataIndex: 'email',
+            key: 'email',
+            hideInTable: true,
+          },
+          {
+            title: 'Projects',
+            dataIndex: ['_count', 'ownedProjects'],
+            key: 'projects',
+            width: 120,
+            search: false,
+            render: (count) => (
+              <Tag
+                color="blue"
+                style={{
+                  borderRadius: 12,
+                  padding: '2px 12px',
+                  fontWeight: 500,
+                }}
+              >
+                {count || 0} owned
+              </Tag>
+            ),
+          },
+          {
+            title: 'Tasks',
+            dataIndex: ['_count', 'assignedTasks'],
+            key: 'tasks',
+            width: 120,
+            search: false,
+            render: (count) => (
+              <Tag
+                color="green"
+                style={{
+                  borderRadius: 12,
+                  padding: '2px 12px',
+                  fontWeight: 500,
+                }}
+              >
+                {count || 0} assigned
+              </Tag>
+            ),
+          },
+          {
+            title: 'Created At',
+            dataIndex: 'createdAt',
+            key: 'createdAt',
+            width: 150,
+            search: false,
+            valueType: 'date',
+            render: (_, record) => (
+              <Text type="secondary">
+                {new Date(record.createdAt).toLocaleDateString('vi-VN', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </Text>
+            ),
+          },
+          {
+            title: 'Actions',
+            key: 'actions',
+            width: 100,
+            search: false,
+            render: (_, record) => (
+              <Space size="small">
+                <Button
+                  type="text"
+                  icon={<EditOutlined />}
+                  onClick={() => handleOpenModal(record)}
+                  style={{ color: '#1890ff' }}
+                />
+                <Popconfirm
+                  title="Delete User"
+                  description={
+                    <div>
+                      Are you sure you want to delete <strong>{record.name}</strong>?
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        This action cannot be undone.
+                      </Text>
+                    </div>
+                  }
+                  onConfirm={() => deleteMutation.mutate(record.id)}
+                  okText="Delete"
+                  okButtonProps={{ danger: true }}
+                  cancelText="Cancel"
+                >
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    loading={deleteMutation.isPending}
+                  />
+                </Popconfirm>
+              </Space>
+            ),
+          },
+        ]}
+      />
 
-      <Card>
-        <Table
-          columns={columns}
-          dataSource={data}
-          rowKey="id"
-          loading={isLoading}
-          pagination={{ pageSize: 10 }}
-        />
-      </Card>
-
-      <Modal
-        title={editingUser ? 'Edit User' : 'Add User'}
-        open={isModalOpen}
-        onOk={handleSubmit}
-        onCancel={handleCloseModal}
-        confirmLoading={createMutation.isPending || updateMutation.isPending}
+      <ModalForm<UserFormValues>
+        title={editingUser ? 'Edit User' : 'Add New User'}
+        open={modalOpen}
+        onOpenChange={(open) => {
+          setModalOpen(open);
+          if (!open) setEditingUser(null);
+        }}
+        initialValues={editingUser ? { name: editingUser.name, email: editingUser.email } : {}}
+        onFinish={handleSubmit}
+        modalProps={{
+          destroyOnClose: true,
+          maskClosable: false,
+        }}
+        submitter={{
+          searchConfig: {
+            submitText: editingUser ? 'Update' : 'Create',
+          },
+        }}
+        width={480}
       >
-        <Form form={form} layout="vertical" className="mt-4">
-          <Form.Item
-            name="name"
-            label="Name"
-            rules={[{ required: true, message: 'Please enter name' }]}
-          >
-            <Input placeholder="Enter user name" />
-          </Form.Item>
-          <Form.Item
-            name="email"
-            label="Email"
-            rules={[
-              { required: true, message: 'Please enter email' },
-              { type: 'email', message: 'Please enter a valid email' },
-            ]}
-          >
-            <Input placeholder="Enter email address" />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
+        <ProFormText
+          name="name"
+          label="Full Name"
+          placeholder="Enter user's full name"
+          rules={[
+            { required: true, message: 'Please enter name' },
+            { min: 2, message: 'Name must be at least 2 characters' },
+          ]}
+          fieldProps={{
+            prefix: <UserOutlined style={{ color: '#bfbfbf' }} />,
+            size: 'large',
+          }}
+        />
+        <ProFormText
+          name="email"
+          label="Email Address"
+          placeholder="Enter email address"
+          rules={[
+            { required: true, message: 'Please enter email' },
+            { type: 'email', message: 'Please enter a valid email' },
+          ]}
+          fieldProps={{
+            prefix: <MailOutlined style={{ color: '#bfbfbf' }} />,
+            size: 'large',
+          }}
+        />
+      </ModalForm>
+    </PageContainer>
   );
 };
 

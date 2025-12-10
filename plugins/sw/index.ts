@@ -1,7 +1,7 @@
-import { IApi } from 'umi';
-import { join } from 'path';
-import fs from 'fs-extra';
 import { build } from 'esbuild';
+import fs from 'fs-extra';
+import { join } from 'path';
+import { IApi } from 'umi';
 
 let devSwBuilt = false;
 
@@ -73,11 +73,18 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 
         if (req.url === swPath || req.url === swPath + '.map') {
           const isMap = req.url.endsWith('.map');
-          const filePath = join(api.cwd, 'public', isMap ? `${swDest || 'sw.js'}.map` : (swDest || 'sw.js'));
+          const filePath = join(
+            api.cwd,
+            'public',
+            isMap ? `${swDest || 'sw.js'}.map` : swDest || 'sw.js',
+          );
 
           if (fs.existsSync(filePath)) {
             const content = fs.readFileSync(filePath, 'utf-8');
-            res.setHeader('Content-Type', isMap ? 'application/json' : 'application/javascript');
+            res.setHeader(
+              'Content-Type',
+              isMap ? 'application/json' : 'application/javascript',
+            );
             res.setHeader('Cache-Control', 'no-cache');
             res.end(content);
             return;
@@ -110,7 +117,9 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
         format: 'iife',
         target: ['es2020'],
         define: {
-          'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
+          'process.env.NODE_ENV': JSON.stringify(
+            process.env.NODE_ENV || 'production',
+          ),
         },
       });
 
@@ -151,7 +160,9 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       });
 
       devSwBuilt = true;
-      console.log(`✅ [SW] Built service worker for dev at public/${swDest || 'sw.js'}`);
+      console.log(
+        `✅ [SW] Built service worker for dev at public/${swDest || 'sw.js'}`,
+      );
     } catch (error) {
       console.error('❌ [SW] Dev build failed:', error);
     }

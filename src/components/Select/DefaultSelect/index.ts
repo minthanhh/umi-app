@@ -27,16 +27,16 @@
 export { SelectWrapper } from './SelectWrapper';
 
 // Context hook for child components
-export { useSelectContext, SelectProvider } from './context';
+export { SelectProvider, useSelectContext } from './context';
 
 // Reusable hooks (can be used independently)
 export {
-  useNormalizedInput,
+  useDataSource,
   useDropdownState,
   useHydration,
   useList,
-  useDataSource,
   useMergedOptions,
+  useNormalizedInput,
   useScrollHandler,
 } from './hooks';
 
@@ -44,25 +44,25 @@ export {
 export type {
   // Domain types
   BaseItem,
-  PrefilledItem,
+  DataSourceResult,
+  DropdownState,
   // API types
   FetchRequest,
   FetchResponse,
-  PaginatedResponse,
   // Config types
   FetchStrategy,
-  SelectWrapperConfig,
-  // Value types
-  SelectValue,
+  // Hook return types
+  NormalizedInput,
+  PaginatedResponse,
+  PrefilledItem,
+  SelectActions,
+  SelectContext,
   SelectOption,
   // Context types
   SelectState,
-  SelectActions,
-  SelectContext,
+  // Value types
+  SelectValue,
+  SelectWrapperConfig,
   // Props types
   SelectWrapperProps,
-  // Hook return types
-  NormalizedInput,
-  DataSourceResult,
-  DropdownState,
 } from './types';

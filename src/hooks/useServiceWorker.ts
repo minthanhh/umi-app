@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface CacheInfo {
   name: string;
@@ -162,10 +162,16 @@ export function useServiceWorker(): UseServiceWorkerReturn {
         updateStatus();
       };
 
-      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+      navigator.serviceWorker.addEventListener(
+        'controllerchange',
+        handleControllerChange,
+      );
 
       return () => {
-        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+        navigator.serviceWorker.removeEventListener(
+          'controllerchange',
+          handleControllerChange,
+        );
       };
     }
   }, [updateStatus, refreshCaches]);
@@ -180,17 +186,29 @@ export function useServiceWorker(): UseServiceWorkerReturn {
     status.registration.addEventListener('updatefound', handleStateChange);
 
     if (status.registration.installing) {
-      status.registration.installing.addEventListener('statechange', handleStateChange);
+      status.registration.installing.addEventListener(
+        'statechange',
+        handleStateChange,
+      );
     }
     if (status.registration.waiting) {
-      status.registration.waiting.addEventListener('statechange', handleStateChange);
+      status.registration.waiting.addEventListener(
+        'statechange',
+        handleStateChange,
+      );
     }
     if (status.registration.active) {
-      status.registration.active.addEventListener('statechange', handleStateChange);
+      status.registration.active.addEventListener(
+        'statechange',
+        handleStateChange,
+      );
     }
 
     return () => {
-      status.registration?.removeEventListener('updatefound', handleStateChange);
+      status.registration?.removeEventListener(
+        'updatefound',
+        handleStateChange,
+      );
     };
   }, [status.registration, updateStatus]);
 

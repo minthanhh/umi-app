@@ -7,15 +7,13 @@ export default defineConfig({
     platform: 'vercel',
   },
 
-  plugins: [
-    require.resolve('./plugins/sw'),
-  ],
+  plugins: [require.resolve('./plugins/sw')],
   serviceWorker: {
     enable: true,
     swSrc: 'src/service-worker.ts',
     swDest: 'sw.js',
   },
-  
+
   antd: {
     import: true,
     // style: 'css-in-js',
