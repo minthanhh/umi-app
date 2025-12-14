@@ -49,10 +49,7 @@ export default defineConfig({
   model: {},
   initialState: {},
   request: {},
-  reactQuery: {
-    devtool: true,
-    queryClient: true,
-  },
+  reactQuery: {},
   layout: false,
   routes: [
     {

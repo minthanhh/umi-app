@@ -1,329 +1,199 @@
 /**
- * DependentSelectField Wrappers
+ * FormDependentSelectField - Ant Design Form Integration
  *
- * Headless/Renderless pattern - tách logic khỏi UI
+ * A select component designed for use within Ant Design Form.
+ * Wraps Select in Form.Item and handles bidirectional sync with store.
  *
- * Architecture:
- * - Form (Ant Design) is the SOURCE OF TRUTH for values
- * - Store provides: options, loading states, disabled states, cascade logic
- * - When user changes value → update both Form and Store
- * - When Store cascade-deletes → sync back to Form
+ * Data flow:
+ * 1. User selects → Store (cascade logic) → Form
+ * 2. Store cascade-delete → Form update
  *
- * Components:
- * 1. DependentFieldWrapper - Render props pattern, works with any UI
- * 2. FormDependentSelectField - Ant Design Form + Select (convenience)
- * 3. useDependentFieldProps - Hook for custom implementations
+ * For standalone usage (no Form), use DependentSelectField instead.
+ * For other form libraries (RHF, Formik), use DependentFieldWrapper.
  */
 
 import type { FormItemProps, SelectProps } from 'antd';
-import { Form, Select, Spin } from 'antd';
-import { useCallback, useEffect, useMemo } from 'react';
+import { Form, Spin } from 'antd';
+import React, { useMemo } from 'react';
 
 import { useDependentField } from './context';
-import type { DependentFieldConfig, SelectOption } from './types';
+import { SyncedSelect } from './SyncedSelect';
+import type { SelectOption } from './types';
+import { formatOptionsForSelect } from './utils';
 
 // ============================================================================
-// Types for Wrapper
-// ============================================================================
-
-/** Props passed to render function */
-export interface DependentFieldRenderProps {
-  /** Current value from Store (use for reference, Form.Item manages actual value) */
-  storeValue: any;
-  /** Change handler - updates Store (Form.Item handles its own onChange) */
-  onStoreChange: (value: any) => void;
-  /** Options in standard format */
-  options: Array<{ label: string; value: string | number; disabled?: boolean }>;
-  /** Raw options from config */
-  rawOptions: SelectOption[];
-  /** Field config */
-  config: DependentFieldConfig | undefined;
-  /** Loading state */
-  isLoading: boolean;
-  /** Disabled because parent has no value */
-  isDisabledByParent: boolean;
-  /** Field name */
-  name: string;
-}
-
-/** Props for DependentFieldWrapper */
-export interface DependentFieldWrapperProps {
-  /** Field name matching config */
-  name: string;
-  /** Override disabled state */
-  disabled?: boolean;
-  /** Render function receiving field props */
-  children: (props: DependentFieldRenderProps) => React.ReactNode;
-}
-
-// ============================================================================
-// Hook - For fully custom implementations
+// TYPES
 // ============================================================================
 
 /**
- * Hook to get all props needed for a dependent field.
- * Use this when you need full control.
- *
- * NOTE: Form library should be source of truth for values.
- * Store provides: options, loading, disabled states, cascade logic.
- *
- * @example
- * ```tsx
- * function MyCustomField({ name }) {
- *   const { options, isLoading, isDisabledByParent, onStoreChange } = useDependentFieldProps(name);
- *
- *   return (
- *     <MyFormLibrary.Field name={name}>
- *       {({ value, onChange }) => (
- *         <MySelect
- *           value={value}
- *           onChange={(v) => { onStoreChange(v); onChange(v); }}
- *           options={options}
- *           loading={isLoading}
- *           disabled={isDisabledByParent}
- *         />
- *       )}
- *     </MyFormLibrary.Field>
- *   );
- * }
- * ```
+ * Props for FormDependentSelectField component.
  */
-export function useDependentFieldProps(
-  name: string,
-): DependentFieldRenderProps {
-  const {
-    config,
-    options,
-    value: storeValue,
-    isLoading,
-    isDisabledByParent,
-    onChange: onStoreChange,
-  } = useDependentField(name);
-
-  const formattedOptions = useMemo(
-    () =>
-      options.map((opt) => ({
-        label: opt.label,
-        value: opt.value,
-        disabled: opt.disabled,
-      })),
-    [options],
-  );
-
-  const handleStoreChange = useCallback(
-    (newValue: any) => {
-      onStoreChange(newValue);
-    },
-    [onStoreChange],
-  );
-
-  return {
-    storeValue,
-    onStoreChange: handleStoreChange,
-    options: formattedOptions,
-    rawOptions: options,
-    config,
-    isLoading,
-    isDisabledByParent,
-    name,
-  };
-}
-
-// ============================================================================
-// Wrapper Component - Render Props Pattern
-// ============================================================================
-
-/**
- * Headless wrapper component using render props pattern.
- * Works with ANY form library or custom UI.
- *
- * IMPORTANT: Form library should be source of truth for values.
- * Store provides: options, loading, disabled states, cascade logic.
- * When user changes value → call onStoreChange AND form's onChange.
- *
- * @example Ant Design Form (recommended: use FormDependentSelectField instead)
- * ```tsx
- * <DependentFieldWrapper name="country">
- *   {({ onStoreChange, options, isLoading, config }) => (
- *     <Form.Item name="country" label="Country">
- *       <Select
- *         onChange={(v) => onStoreChange(v)} // Form.Item handles value
- *         options={options}
- *         loading={isLoading}
- *         mode={config?.mode}
- *       />
- *     </Form.Item>
- *   )}
- * </DependentFieldWrapper>
- * ```
- *
- * @example React Hook Form
- * ```tsx
- * <DependentFieldWrapper name="country">
- *   {({ onStoreChange, options, isLoading }) => (
- *     <Controller
- *       name="country"
- *       control={control}
- *       render={({ field }) => (
- *         <Select
- *           {...field}
- *           onChange={(v) => { onStoreChange(v); field.onChange(v); }}
- *           options={options}
- *           loading={isLoading}
- *         />
- *       )}
- *     />
- *   )}
- * </DependentFieldWrapper>
- * ```
- *
- * @example Formik
- * ```tsx
- * <DependentFieldWrapper name="country">
- *   {({ onStoreChange, options }) => (
- *     <Field name="country">
- *       {({ field, form }) => (
- *         <Select
- *           value={field.value}
- *           onChange={(v) => { onStoreChange(v); form.setFieldValue('country', v); }}
- *           options={options}
- *         />
- *       )}
- *     </Field>
- *   )}
- * </DependentFieldWrapper>
- * ```
- */
-export function DependentFieldWrapper({
-  name,
-  children,
-}: DependentFieldWrapperProps) {
-  const props = useDependentFieldProps(name);
-
-  if (!props.config) {
-    console.warn(`DependentFieldWrapper: No config found for field "${name}"`);
-    return null;
-  }
-
-  return <>{children(props)}</>;
-}
-
-// ============================================================================
-// Ant Design Convenience Component
-// ============================================================================
-
 export interface FormDependentSelectFieldProps {
-  /** Field name matching config */
+  /** Field name (must match a config in DependentSelectProvider) */
   name: string;
+
   /** Form.Item label */
   label?: React.ReactNode;
-  /** Form.Item rules */
+
+  /** Form.Item validation rules */
   rules?: FormItemProps['rules'];
+
   /** Override disabled state */
   disabled?: boolean;
+
+  /**
+   * External options (overrides config.options).
+   * Use this when fetching options via React Query or similar.
+   */
+  options?: SelectOption[];
+
+  /**
+   * External loading state (overrides store loading).
+   * Use this when you control loading via React Query.
+   */
+  loading?: boolean;
+
   /** Additional Form.Item props */
   formItemProps?: Omit<FormItemProps, 'name' | 'label' | 'rules'>;
-  /** Additional Select props */
+
+  /**
+   * Additional Select props.
+   * Note: value, onChange, options, mode, loading, disabled are controlled.
+   */
   selectProps?: Omit<
     SelectProps,
     'value' | 'onChange' | 'options' | 'mode' | 'loading' | 'disabled'
   >;
 }
 
-/**
- * Inner Select component that syncs Form ↔ Store
- *
- * Flow:
- * 1. Form.Item injects value/onChange to this component
- * 2. When user selects → update Store via onStoreChange
- * 3. When Store cascade-deletes → sync back to Form via form.setFieldValue
- */
-interface SyncedSelectProps extends Omit<SelectProps, 'value' | 'onChange'> {
-  value?: any;
-  onChange?: (value: any) => void;
-  storeValue: any;
-  onStoreChange: (value: any) => void;
-  name: string;
-}
-
-function SyncedSelect({
-  value,
-  onChange,
-  storeValue,
-  onStoreChange,
-  name,
-  ...rest
-}: SyncedSelectProps) {
-  const form = Form.useFormInstance();
-
-  // Sync Store → Form when store value changes (e.g., cascade delete)
-  useEffect(() => {
-    // Only sync if store value is different from form value
-    // This handles cascade delete scenarios
-    if (storeValue !== value) {
-      form.setFieldValue(name, storeValue);
-    }
-  }, [storeValue, form, name, value]);
-
-  // Handle user selection - update both Form and Store
-  const handleChange = useCallback(
-    (newValue: any) => {
-      // Update Store (triggers cascade logic)
-      onStoreChange(newValue);
-      // Update Form (Form.Item's onChange)
-      onChange?.(newValue);
-    },
-    [onChange, onStoreChange],
-  );
-
-  return <Select value={value} onChange={handleChange} {...rest} />;
-}
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 /**
- * Convenience component for Ant Design Form + Select.
+ * Dependent select field for Ant Design Form.
  *
- * Architecture:
- * - Form.Item is the source of truth for the value
- * - Store provides options, loading, disabled states
- * - Changes sync bidirectionally:
- *   - User selects → Store (cascade logic) → Form
- *   - Store cascade-deletes → Form
+ * Features:
+ * - Integrates with Form.Item (validation, layout, etc.)
+ * - Bidirectional sync between Form and Store
+ * - Supports external options (React Query)
+ * - Auto-disables when parent has no value
+ * - Handles cascade delete automatically
  *
- * For other form libraries, use DependentFieldWrapper or useDependentFieldProps.
+ * @param props - Component props
+ * @returns Form.Item with Select or null if no config
+ *
+ * @example Basic usage
+ * ```tsx
+ * <Form form={form}>
+ *   <DependentSelectProvider configs={configs} adapter={adapter}>
+ *     <FormDependentSelectField name="country" label="Country" />
+ *     <FormDependentSelectField name="province" label="Province" />
+ *     <FormDependentSelectField name="city" label="City" />
+ *   </DependentSelectProvider>
+ * </Form>
+ * ```
+ *
+ * @example With React Query
+ * ```tsx
+ * function ProvinceSelect() {
+ *   const { parentValue } = useDependentField('province');
+ *
+ *   const { data: provinces, isLoading } = useQuery({
+ *     queryKey: ['provinces', parentValue],
+ *     queryFn: () => fetchProvinces(parentValue),
+ *     enabled: !!parentValue,
+ *   });
+ *
+ *   return (
+ *     <FormDependentSelectField
+ *       name="province"
+ *       label="Province"
+ *       options={provinces}
+ *       loading={isLoading}
+ *     />
+ *   );
+ * }
+ * ```
+ *
+ * @example With validation
+ * ```tsx
+ * <FormDependentSelectField
+ *   name="country"
+ *   label="Country"
+ *   rules={[{ required: true, message: 'Please select a country' }]}
+ * />
+ * ```
  */
 export function FormDependentSelectField({
   name,
   label,
   rules,
   disabled,
+  options: externalOptions,
+  loading: externalLoading,
   formItemProps,
   selectProps,
 }: FormDependentSelectFieldProps) {
+  // Get field state from store via hook
+  const {
+    config: fieldConfig,
+    options: storeOptions,
+    value: storeValue,
+    isLoading: storeLoading,
+    isDisabledByParent,
+    onChange: handleStoreChange,
+  } = useDependentField(name, { options: externalOptions });
+
+  // Resolve loading state (external takes priority)
+  const isLoading = externalLoading ?? storeLoading;
+
+  // Format options for Ant Design Select
+  const formattedOptions = useMemo(() => {
+    const options = externalOptions ?? storeOptions;
+    return formatOptionsForSelect(options);
+  }, [externalOptions, storeOptions]);
+
+  // Warn in development if config not found
+  if (!fieldConfig) {
+    console.warn(
+      `[FormDependentSelectField] No config found for field "${name}". ` +
+        'Make sure the field name matches a config in DependentSelectProvider.',
+    );
+    return null;
+  }
+
+  // Determine final disabled state
+  const isFieldDisabled = disabled || isDisabledByParent;
+
   return (
-    <DependentFieldWrapper name={name}>
-      {({ storeValue, onStoreChange, options, isLoading, isDisabledByParent, config }) => (
-        <Form.Item name={name} label={label} rules={rules} {...formItemProps}>
-          <SyncedSelect
-            storeValue={storeValue}
-            onStoreChange={onStoreChange}
-            name={name}
-            options={options}
-            mode={config?.mode}
-            placeholder={config?.placeholder}
-            disabled={disabled || isDisabledByParent}
-            loading={isLoading}
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            notFoundContent={isLoading ? <Spin size="small" /> : undefined}
-            style={{ minWidth: 200 }}
-            {...config?.selectProps}
-            {...selectProps}
-          />
-        </Form.Item>
-      )}
-    </DependentFieldWrapper>
+    <Form.Item name={name} label={label} rules={rules} {...formItemProps}>
+      <SyncedSelect
+        // Sync props
+        storeValue={storeValue}
+        onStoreChange={handleStoreChange}
+        fieldName={name}
+        // Options
+        options={formattedOptions}
+        // Config-based props
+        mode={fieldConfig.mode}
+        placeholder={fieldConfig.placeholder}
+        // State
+        disabled={isFieldDisabled}
+        loading={isLoading}
+        // Default behaviors
+        allowClear
+        showSearch
+        optionFilterProp="label"
+        // Loading indicator
+        notFoundContent={isLoading ? <Spin size="small" /> : undefined}
+        // Styling
+        style={{ minWidth: 200 }}
+        // Spread config selectProps
+        {...fieldConfig.selectProps}
+        // Spread component selectProps last (highest priority)
+        {...selectProps}
+      />
+    </Form.Item>
   );
 }
-
-export default FormDependentSelectField;

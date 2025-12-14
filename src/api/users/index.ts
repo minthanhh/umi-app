@@ -43,20 +43,50 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
         }
       }
 
+      // Action: Get users by IDs (for hydration)
+      if (action === 'by-ids') {
+        const { ids = [] } = req.body;
+        if (!ids.length) {
+          return res.status(200).json({ data: [], total: 0, success: true });
+        }
+        try {
+          const users = await prisma.user.findMany({
+            where: { id: { in: ids.map((id: string | number) => Number(id)) } },
+          });
+          return res.status(200).json({ data: users, total: users.length, success: true });
+        } catch (error) {
+          console.error(error);
+          return res.status(500).json({ error: 'Failed to retrieve users by IDs' });
+        }
+      }
+
       // List users (default action)
-      const { current = '1', pageSize = '10', sorter, ids = [] } = req.body;
+      const { current = '1', pageSize = '10', sorter, ids = [], keyword } = req.body;
       const page = parseInt(current as string, 10);
       const limit = parseInt(pageSize as string, 10);
       const skip = (page - 1) * limit;
 
       try {
-        const whereClause = ids.length > 0 ? { id: { in: ids } } : {};
+        const whereClause: Record<string, unknown> = {};
+
+        // Filter by IDs if provided
+        if (ids.length > 0) {
+          whereClause.id = { in: ids };
+        }
+
+        // Search by keyword
+        if (keyword) {
+          whereClause.OR = [
+            { name: { contains: keyword, mode: 'insensitive' } },
+            { email: { contains: keyword, mode: 'insensitive' } },
+          ];
+        }
 
         const [users, total] = await Promise.all([
           prisma.user.findMany({
             skip,
             take: limit,
-            orderBy: sorter,
+            orderBy: sorter || { id: 'asc' },
             where: whereClause,
           }),
           prisma.user.count({

@@ -17,7 +17,7 @@ var __copyProps = (to, from, except, desc) => {
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// src/.umi/api/_middlewares.ts
+// src/.umi-production/api/_middlewares.ts
 var middlewares_exports = {};
 __export(middlewares_exports, {
   default: () => middlewares_default

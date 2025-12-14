@@ -58,7 +58,36 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
           ids = [],
           current = 1,
           pageSize = 10,
+          keyword,
         } = req.body;
+
+        // Action: Get projects by IDs (for hydration)
+        if (action === 'by-ids') {
+          if (!ids.length) {
+            return res.status(200).json({ data: [], total: 0, success: true });
+          }
+          const projects = await prisma.project.findMany({
+            where: { id: { in: ids.map((id: string | number) => Number(id)) } },
+            include: {
+              owner: {
+                select: { id: true, name: true, email: true, avatar: true },
+              },
+              members: {
+                select: {
+                  userId: true,
+                  role: true,
+                  user: {
+                    select: { id: true, name: true, avatar: true },
+                  },
+                },
+              },
+              _count: {
+                select: { tasks: true, members: true },
+              },
+            },
+          });
+          return res.status(200).json({ data: projects, total: projects.length, success: true });
+        }
 
         // Action: Get projects by member IDs
         if (action === 'by-members') {
@@ -66,23 +95,25 @@ export default async function (req: UmiApiRequest, res: UmiApiResponse) {
           const limit = parseInt(pageSize as string, 10);
           const skip = (page - 1) * limit;
 
-          let whereClause: Record<string, unknown> = {};
+          const whereClause: Record<string, unknown> = {};
 
-          // If specific project IDs requested (for fetchByIds)
-          if (ids.length > 0) {
-            whereClause = { id: { in: ids } };
-          }
           // If filtering by member IDs
-          else if (memberIds.length > 0) {
-            whereClause = {
-              members: {
-                some: {
-                  userId: {
-                    in: memberIds.map((id: string | number) => Number(id)),
-                  },
+          if (memberIds.length > 0) {
+            whereClause.members = {
+              some: {
+                userId: {
+                  in: memberIds.map((id: string | number) => Number(id)),
                 },
               },
             };
+          }
+
+          // Search by keyword
+          if (keyword) {
+            whereClause.OR = [
+              { name: { contains: keyword, mode: 'insensitive' } },
+              { description: { contains: keyword, mode: 'insensitive' } },
+            ];
           }
 
           const [projects, total] = await Promise.all([

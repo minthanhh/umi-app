@@ -290,14 +290,14 @@ const RHFDemo = () => {
                 name="gender"
                 control={control}
                 render={({ field }) => {
-                  console.log({field})
+                  console.log({ field });
                   return (
-                  <Radio.Group {...field}>
-                    <Radio value="male">Male</Radio>
-                    <Radio value="female">Female</Radio>
-                    <Radio value="other">Other</Radio>
-                  </Radio.Group>
-                )
+                    <Radio.Group {...field}>
+                      <Radio value="male">Male</Radio>
+                      <Radio value="female">Female</Radio>
+                      <Radio value="other">Other</Radio>
+                    </Radio.Group>
+                  );
                 }}
               />
               {/* {errors.gender && (

@@ -137,7 +137,10 @@ export interface FormAdapter {
   /**
    * Set a single field value in the form
    */
-  setFieldValue: (name: string, value: FieldValue | FieldValue[] | undefined) => void;
+  setFieldValue: (
+    name: string,
+    value: FieldValue | FieldValue[] | undefined,
+  ) => void;
 
   /**
    * Set multiple field values at once (optional, for batching)

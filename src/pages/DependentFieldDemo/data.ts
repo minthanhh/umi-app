@@ -71,7 +71,10 @@ export const cities: Option[] = [
 ];
 
 // Helper to filter options by parent
-export function filterByParent(options: Option[], parentValue?: string): Option[] {
+export function filterByParent(
+  options: Option[],
+  parentValue?: string,
+): Option[] {
   if (!parentValue) return [];
   return options.filter((opt) => opt.parentValue === parentValue);
 }

@@ -28,11 +28,8 @@ import {
   Typography,
 } from 'antd';
 
-import {
-  DependentSelectProvider,
-  FormDependentSelectField,
-} from './index';
-import type { DependentFieldConfig, FormAdapter, SelectOption } from './types';
+import { DependentSelectProvider, FormDependentSelectField } from './index';
+import type { FieldConfig, FormAdapter, SelectOption } from './types';
 
 const { Title, Text } = Typography;
 
@@ -195,7 +192,7 @@ const models: SelectOption[] = [
 
 type ConfigSetType = 'location' | 'category' | 'brand';
 
-const CONFIG_SETS: Record<ConfigSetType, DependentFieldConfig[]> = {
+const CONFIG_SETS: Record<ConfigSetType, FieldConfig[]> = {
   location: [
     {
       name: 'country',
@@ -303,7 +300,7 @@ const INITIAL_VALUES: Record<ConfigSetType, Record<string, any>> = {
 // ============================================================================
 
 interface FetchedData {
-  configs: DependentFieldConfig[];
+  configs: FieldConfig[];
   values: Record<string, any>;
 }
 
@@ -336,7 +333,9 @@ const fakeApi = {
   /**
    * Fetch only configs (simulates dynamic form configuration from server)
    */
-  fetchConfigs: (configType: ConfigSetType): Promise<DependentFieldConfig[]> => {
+  fetchConfigs: (
+    configType: ConfigSetType,
+  ): Promise<FieldConfig[]> => {
     return new Promise((resolve) => {
       const delay = 400 + Math.random() * 600;
 
@@ -405,11 +404,18 @@ export function DependentSelectDemo() {
   const [isLoadingValues, setIsLoadingValues] = useState(false);
 
   // Fetched data
-  const [fetchedConfigs, setFetchedConfigs] = useState<DependentFieldConfig[] | null>(null);
-  const [fetchedValues, setFetchedValues] = useState<Record<string, any> | null>(null);
+  const [fetchedConfigs, setFetchedConfigs] = useState<
+    FieldConfig[] | null
+  >(null);
+  const [fetchedValues, setFetchedValues] = useState<Record<
+    string,
+    any
+  > | null>(null);
 
   // Controlled value state (only used when valueMode === 'controlled')
-  const [controlledValue, setControlledValue] = useState<Record<string, any>>({});
+  const [controlledValue, setControlledValue] = useState<Record<string, any>>(
+    {},
+  );
 
   const [form] = Form.useForm();
 
@@ -551,7 +557,9 @@ export function DependentSelectDemo() {
   };
 
   const handleValueModeChange = (newMode: ValueMode) => {
-    console.log(`[Demo] Switching value mode from "${valueMode}" to "${newMode}"`);
+    console.log(
+      `[Demo] Switching value mode from "${valueMode}" to "${newMode}"`,
+    );
     setValueMode(newMode);
 
     // Reset and refetch when mode changes
@@ -566,7 +574,9 @@ export function DependentSelectDemo() {
   };
 
   const handleFetchModeChange = (newMode: FetchMode) => {
-    console.log(`[Demo] Switching fetch mode from "${fetchMode}" to "${newMode}"`);
+    console.log(
+      `[Demo] Switching fetch mode from "${fetchMode}" to "${newMode}"`,
+    );
     setFetchMode(newMode);
   };
 
@@ -640,11 +650,17 @@ export function DependentSelectDemo() {
               <Radio.Button value="fetchSeparate">Parallel Fetch</Radio.Button>
             </Radio.Group>
           </div>
-          <Text type="secondary" style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
+          <Text
+            type="secondary"
+            style={{ fontSize: 12, marginTop: 4, display: 'block' }}
+          >
             {fetchMode === 'static' && 'Uses hardcoded configs and values'}
-            {fetchMode === 'fetchAll' && 'Fetches configs + values in one API call'}
-            {fetchMode === 'fetchConfigsFirst' && 'Fetches configs first, then values (sequential)'}
-            {fetchMode === 'fetchSeparate' && 'Fetches configs and values in parallel'}
+            {fetchMode === 'fetchAll' &&
+              'Fetches configs + values in one API call'}
+            {fetchMode === 'fetchConfigsFirst' &&
+              'Fetches configs first, then values (sequential)'}
+            {fetchMode === 'fetchSeparate' &&
+              'Fetches configs and values in parallel'}
           </Text>
         </div>
 
@@ -732,7 +748,10 @@ export function DependentSelectDemo() {
                   Submit Form
                 </Button>
                 <Button onClick={() => form.resetFields()}>Reset Form</Button>
-                <Button onClick={handleRefetchConfigs} loading={isLoadingConfigs}>
+                <Button
+                  onClick={handleRefetchConfigs}
+                  loading={isLoadingConfigs}
+                >
                   Refetch Configs
                 </Button>
                 <Button onClick={handleRefetchValues} loading={isLoadingValues}>

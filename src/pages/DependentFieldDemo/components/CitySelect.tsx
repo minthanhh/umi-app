@@ -18,11 +18,8 @@ interface CitySelectProps {
 }
 
 export function CitySelect({ value, onChange }: CitySelectProps) {
-  const {
-    onSyncStore,
-    dependencyValues,
-    isDependencySatisfied,
-  } = useDependentField<string>('city');
+  const { onSyncStore, dependencyValues, isDependencySatisfied } =
+    useDependentField<string>('city');
 
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(false);

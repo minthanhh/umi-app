@@ -18,11 +18,8 @@ interface ProvinceSelectProps {
 }
 
 export function ProvinceSelect({ value, onChange }: ProvinceSelectProps) {
-  const {
-    onSyncStore,
-    dependencyValues,
-    isDependencySatisfied,
-  } = useDependentField<string>('province');
+  const { onSyncStore, dependencyValues, isDependencySatisfied } =
+    useDependentField<string>('province');
 
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(false);

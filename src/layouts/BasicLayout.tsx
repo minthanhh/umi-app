@@ -79,7 +79,7 @@ const menuItems: MenuItem[] = [
     icon: <FormOutlined />,
     label: 'Dependent Field',
     path: '/dependent-field',
-  }
+  },
 ];
 
 const BasicLayout: React.FC = () => {

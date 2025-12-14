@@ -137,8 +137,10 @@ export default function DependentFieldDemoPage() {
         <Card title="Architecture">
           <Paragraph>
             <Title level={5}>Form is Source of Truth</Title>
-            <pre style={{ background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
-{`┌─────────────────────────────────────────────────────┐
+            <pre
+              style={{ background: '#f5f5f5', padding: 12, borderRadius: 4 }}
+            >
+              {`┌─────────────────────────────────────────────────────┐
 │                    Antd Form                        │
 │              (SOURCE OF TRUTH)                      │
 │  form.getFieldValue() / form.setFieldValue()       │
@@ -166,8 +168,10 @@ export default function DependentFieldDemoPage() {
 
           <Paragraph>
             <Title level={5}>Usage</Title>
-            <pre style={{ background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
-{`// 1. Create adapter
+            <pre
+              style={{ background: '#f5f5f5', padding: 12, borderRadius: 4 }}
+            >
+              {`// 1. Create adapter
 const adapter = createAntdAdapter(form);
 
 // 2. Wrap with provider

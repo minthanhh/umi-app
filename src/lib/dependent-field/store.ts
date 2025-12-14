@@ -11,8 +11,8 @@
  */
 
 import type {
-  DependentFieldConfig,
   DependencyChangeParams,
+  DependentFieldConfig,
   FieldValue,
   FieldValues,
   FormAdapter,
@@ -122,7 +122,9 @@ export class DependentFieldStore {
     return { ...this.previousValues };
   };
 
-  getDependencyValues = (fieldName: string): Record<string, FieldValue | FieldValue[]> => {
+  getDependencyValues = (
+    fieldName: string,
+  ): Record<string, FieldValue | FieldValue[]> => {
     const deps = this.reverseDependency.get(fieldName) ?? [];
     const result: Record<string, FieldValue | FieldValue[]> = {};
 
@@ -168,7 +170,10 @@ export class DependentFieldStore {
    * 2. Notify subscribers
    * 3. Trigger dependency callbacks
    */
-  setValue = (fieldName: string, newValue: FieldValue | FieldValue[] | undefined): void => {
+  setValue = (
+    fieldName: string,
+    newValue: FieldValue | FieldValue[] | undefined,
+  ): void => {
     if (this.isDestroyed) return;
 
     const oldValue = this.previousValues[fieldName];
@@ -177,7 +182,8 @@ export class DependentFieldStore {
     if (shallowEqual(oldValue, newValue)) return;
 
     // Capture previous dependency values for dependent fields
-    const previousDependencySnapshots = this.captureDependencySnapshots(fieldName);
+    const previousDependencySnapshots =
+      this.captureDependencySnapshots(fieldName);
 
     // Update form via adapter (Form is source of truth)
     if (this.adapter) {
@@ -203,14 +209,18 @@ export class DependentFieldStore {
    * Sync value from form to store cache.
    * Call this when form value changes externally.
    */
-  syncFromForm = (fieldName: string, newValue: FieldValue | FieldValue[] | undefined): void => {
+  syncFromForm = (
+    fieldName: string,
+    newValue: FieldValue | FieldValue[] | undefined,
+  ): void => {
     if (this.isDestroyed) return;
 
     const oldValue = this.previousValues[fieldName];
     if (shallowEqual(oldValue, newValue)) return;
 
     // Capture previous dependency values
-    const previousDependencySnapshots = this.captureDependencySnapshots(fieldName);
+    const previousDependencySnapshots =
+      this.captureDependencySnapshots(fieldName);
 
     // Update cache only (form already has the value)
     if (newValue === undefined) {
@@ -254,7 +264,10 @@ export class DependentFieldStore {
     };
   };
 
-  subscribeToField = (fieldName: string, listener: Subscriber): (() => void) => {
+  subscribeToField = (
+    fieldName: string,
+    listener: Subscriber,
+  ): (() => void) => {
     if (!this.fieldSubscribers.has(fieldName)) {
       this.fieldSubscribers.set(fieldName, new Set());
     }
@@ -272,7 +285,10 @@ export class DependentFieldStore {
   private captureDependencySnapshots(
     changedField: string,
   ): Map<string, Record<string, FieldValue | FieldValue[]>> {
-    const snapshots = new Map<string, Record<string, FieldValue | FieldValue[]>>();
+    const snapshots = new Map<
+      string,
+      Record<string, FieldValue | FieldValue[]>
+    >();
     const dependents = this.getDependentFields(changedField);
 
     for (const dependent of dependents) {

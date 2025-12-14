@@ -52,9 +52,9 @@ export { DependentFieldStore } from './store';
 
 // Type exports
 export type {
+  DependencyChangeParams,
   DependentFieldConfig,
   DependentFieldProviderProps,
-  DependencyChangeParams,
   FieldValue,
   FieldValues,
   FormAdapter,
@@ -70,3 +70,17 @@ export {
   useFormikAdapter,
   useRHFAdapter,
 } from './adapters';
+
+// Infinite scroll exports
+export {
+  useInfiniteDependentField,
+  type BaseItem,
+  type FetchRequest,
+  type FetchResponse,
+  type InfiniteFieldConfig,
+  type SelectOption,
+  type UseInfiniteDependentFieldResult,
+} from './hooks';
+
+// Component exports
+export { InfiniteDependentSelect } from './components/InfiniteDependentSelect';
