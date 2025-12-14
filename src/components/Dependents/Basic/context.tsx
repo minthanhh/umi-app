@@ -1,17 +1,31 @@
 /**
- * DependentSelect - React Context & Hooks
+ * DependentSelect - React Context & Hooks (Optimized)
  *
- * Provides React integration via Context and useSyncExternalStore.
+ * Context Optimization techniques applied:
+ * 1. Context Splitting - Separate contexts for store, actions, and config
+ *    - Prevents unnecessary re-renders when only one part changes
+ *    - Components can subscribe to only what they need
+ *
+ * 2. Stable Reference Pattern - useMemo/useCallback for context values
+ *    - Actions context never changes reference (stable callbacks)
+ *    - Config context only changes when configs change
+ *
+ * 3. Selective Subscription via useSyncExternalStore
+ *    - useDependentField only re-renders when specific field changes
+ *    - Fine-grained subscriptions at field level
  *
  * Key exports:
  * - DependentSelectProvider: Wrap your dependent selects with this
- * - useDependentField: Subscribe to a single field (optimized - only re-renders when field changes)
+ * - useDependentField: Subscribe to a single field (optimized)
  * - useDependentStore: Get store instance for advanced operations
+ * - useDependentActions: Get stable action functions (never re-renders)
+ * - useDependentConfig: Get config for a field
  * - useDependentValues: Get all values (re-renders on any field change)
  */
 
 import {
   createContext,
+  memo,
   useCallback,
   useContext,
   useEffect,
@@ -19,6 +33,7 @@ import {
   useRef,
   useSyncExternalStore,
 } from 'react';
+import type { ReactNode } from 'react';
 
 import { DependentSelectStore } from './store';
 import type {
@@ -33,27 +48,113 @@ import type {
 export type { SelectOption } from './types';
 
 // ============================================================================
-// CONTEXT
+// CONTEXT SPLITTING - Separate contexts for different concerns
 // ============================================================================
 
 /**
- * Context for sharing the store instance across components.
- * null when used outside of provider.
+ * Store Context - provides access to the store instance.
+ * Changes when: store is recreated (config structure changes)
  */
-const DependentStoreContext = createContext<DependentSelectStore | null>(null);
+const StoreContext = createContext<DependentSelectStore | null>(null);
+
+/**
+ * Actions Context - provides stable action functions.
+ * Changes when: NEVER (actions are bound to store on creation)
+ * This allows components to call actions without re-rendering.
+ */
+interface ActionsContextValue {
+  /** Set value for a field */
+  setValue: (fieldName: string, value: unknown) => void;
+  /** Set multiple values at once */
+  setValues: (values: Partial<DependentFieldValues>) => void;
+  /** Set external options for a field */
+  setExternalOptions: (fieldName: string, options: SelectOption[]) => void;
+  /** Get current value of a field (non-reactive) */
+  getValue: (fieldName: string) => unknown;
+  /** Get all values (non-reactive) */
+  getValues: () => DependentFieldValues;
+}
+
+const ActionsContext = createContext<ActionsContextValue | null>(null);
+
+/**
+ * Config Context - provides field configurations.
+ * Changes when: configs prop changes
+ */
+interface ConfigContextValue {
+  /** Get config for a specific field */
+  getConfig: (fieldName: string) => DependentFieldConfig | undefined;
+  /** Get all configs */
+  getConfigs: () => ReadonlyArray<DependentFieldConfig>;
+  /** Check if a field exists */
+  hasField: (fieldName: string) => boolean;
+}
+
+const ConfigContext = createContext<ConfigContextValue | null>(null);
 
 // ============================================================================
-// PROVIDER COMPONENT
+// EMPTY CONSTANTS - Avoid creating new objects on each render
 // ============================================================================
+
+const EMPTY_OPTIONS: SelectOption[] = [];
+
+// ============================================================================
+// PROVIDER COMPONENT (Optimized with Context Splitting)
+// ============================================================================
+
+/**
+ * Internal provider that sets up all contexts.
+ * Memoized to prevent unnecessary re-renders of children.
+ */
+interface InternalProviderProps {
+  store: DependentSelectStore;
+  children: ReactNode;
+}
+
+const InternalProvider = memo(function InternalProvider({
+  store,
+  children,
+}: InternalProviderProps) {
+  // Create stable actions value (never changes reference)
+  const actionsValue = useMemo<ActionsContextValue>(
+    () => ({
+      setValue: store.setValue,
+      setValues: store.setValues,
+      setExternalOptions: store.setExternalOptions,
+      getValue: (fieldName: string) => store.getFieldSnapshot(fieldName).value,
+      getValues: store.getValues,
+    }),
+    [store],
+  );
+
+  // Create stable config value
+  const configValue = useMemo<ConfigContextValue>(
+    () => ({
+      getConfig: store.getConfig,
+      getConfigs: store.getConfigs,
+      hasField: (fieldName: string) => store.getConfig(fieldName) !== undefined,
+    }),
+    [store],
+  );
+
+  return (
+    <StoreContext.Provider value={store}>
+      <ActionsContext.Provider value={actionsValue}>
+        <ConfigContext.Provider value={configValue}>
+          {children}
+        </ConfigContext.Provider>
+      </ActionsContext.Provider>
+    </StoreContext.Provider>
+  );
+});
 
 /**
  * Provider component that creates and manages the DependentSelectStore.
  *
- * Responsibilities:
- * - Create store instance when configs change
- * - Cleanup store on unmount
- * - Sync controlled values
- * - Update adapter when it changes
+ * Optimizations:
+ * - Context splitting: store, actions, config are separate contexts
+ * - Stable references: actions never change, reducing re-renders
+ * - Memoized internal provider prevents children re-renders
  *
  * @example Basic usage
  * ```tsx
@@ -119,20 +220,16 @@ export function DependentSelectProvider({
     store.setAdapter(adapter);
   }, [adapter, store]);
 
-  return (
-    <DependentStoreContext.Provider value={store}>
-      {children}
-    </DependentStoreContext.Provider>
-  );
+  return <InternalProvider store={store}>{children}</InternalProvider>;
 }
 
 // ============================================================================
-// HOOKS - Store Access
+// HOOKS - Context Access (Optimized)
 // ============================================================================
 
 /**
  * Get the store instance directly.
- * Use this for advanced operations like setValue, setExternalOptions.
+ * Use this for advanced operations or when you need low-level access.
  *
  * @throws Error if used outside of DependentSelectProvider
  *
@@ -140,17 +237,12 @@ export function DependentSelectProvider({
  * ```tsx
  * function MyComponent() {
  *   const store = useDependentStore();
- *
- *   const handleReset = () => {
- *     store.setValue('country', undefined);
- *   };
- *
- *   return <button onClick={handleReset}>Reset</button>;
+ *   // Direct store access for advanced use cases
  * }
  * ```
  */
 export function useDependentStore(): DependentSelectStore {
-  const store = useContext(DependentStoreContext);
+  const store = useContext(StoreContext);
 
   if (!store) {
     throw new Error(
@@ -164,25 +256,73 @@ export function useDependentStore(): DependentSelectStore {
 /**
  * Get the store instance if available (returns null if not inside provider).
  * Use this when you need optional store access without throwing.
+ */
+export function useDependentStoreOptional(): DependentSelectStore | null {
+  return useContext(StoreContext);
+}
+
+/**
+ * Get stable action functions.
+ * These functions NEVER change reference, so components using only actions
+ * will never re-render due to context changes.
+ *
+ * @throws Error if used outside of DependentSelectProvider
  *
  * @example
  * ```tsx
- * function MyComponent() {
- *   const store = useDependentStoreOptional();
+ * function ResetButton() {
+ *   // This component will NEVER re-render due to context changes
+ *   const { setValue } = useDependentActions();
  *
- *   // Safe to use without provider
- *   if (store) {
- *     store.setExternalOptions('field', options);
- *   }
+ *   return (
+ *     <button onClick={() => setValue('country', undefined)}>
+ *       Reset Country
+ *     </button>
+ *   );
  * }
  * ```
  */
-export function useDependentStoreOptional(): DependentSelectStore | null {
-  return useContext(DependentStoreContext);
+export function useDependentActions(): ActionsContextValue {
+  const actions = useContext(ActionsContext);
+
+  if (!actions) {
+    throw new Error(
+      '[DependentSelect] useDependentActions must be used within DependentSelectProvider',
+    );
+  }
+
+  return actions;
+}
+
+/**
+ * Get config access functions.
+ * Changes only when configs prop changes.
+ *
+ * @throws Error if used outside of DependentSelectProvider
+ *
+ * @example
+ * ```tsx
+ * function FieldLabel({ fieldName }: { fieldName: string }) {
+ *   const { getConfig } = useDependentConfig();
+ *   const config = getConfig(fieldName);
+ *   return <label>{config?.label}</label>;
+ * }
+ * ```
+ */
+export function useDependentConfig(): ConfigContextValue {
+  const config = useContext(ConfigContext);
+
+  if (!config) {
+    throw new Error(
+      '[DependentSelect] useDependentConfig must be used within DependentSelectProvider',
+    );
+  }
+
+  return config;
 }
 
 // ============================================================================
-// HOOKS - Field Subscription
+// HOOKS - Field Subscription (Selective Subscription Pattern)
 // ============================================================================
 
 /**
@@ -222,8 +362,11 @@ export interface UseDependentFieldResult {
 /**
  * Hook for subscribing to a specific field.
  *
- * Optimized: only re-renders when THIS field's snapshot changes.
- * Uses useSyncExternalStore for concurrent mode compatibility.
+ * Optimizations:
+ * - Selective subscription: only re-renders when THIS field changes
+ * - useSyncExternalStore for concurrent mode compatibility
+ * - Stable onChange callback (memoized)
+ * - External options sync during render (no extra effect)
  *
  * @param fieldName - Name of the field to subscribe to
  * @param hookOptions - Optional configuration (external options)
@@ -266,19 +409,20 @@ export function useDependentField(
   const store = useDependentStore();
   const externalOptions = hookOptions?.options;
 
-  // Subscribe function for useSyncExternalStore
+  // Subscribe function for useSyncExternalStore (stable reference)
   const subscribeToField = useCallback(
     (onStoreChange: () => void) => store.subscribe(fieldName, onStoreChange),
     [store, fieldName],
   );
 
-  // Snapshot getter for useSyncExternalStore
+  // Snapshot getter for useSyncExternalStore (stable reference)
   const getFieldSnapshot = useCallback(
     (): DependentFieldSnapshot => store.getFieldSnapshot(fieldName),
     [store, fieldName],
   );
 
   // Subscribe to field changes with useSyncExternalStore
+  // This provides selective subscription - only re-renders when this field changes
   const fieldSnapshot = useSyncExternalStore(
     subscribeToField,
     getFieldSnapshot,
@@ -292,11 +436,10 @@ export function useDependentField(
   );
 
   // Get filtered options (recalculate when parent value or external options change)
-  const filteredOptions = useMemo(
-    () => store.getOptions(fieldName, externalOptions),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [store, fieldName, fieldSnapshot.parentValue, externalOptions],
-  );
+  const filteredOptions = useMemo(() => {
+    const options = store.getOptions(fieldName, externalOptions);
+    return options.length > 0 ? options : EMPTY_OPTIONS;
+  }, [store, fieldName, fieldSnapshot.parentValue, externalOptions]);
 
   // Check if disabled because parent has no value
   const isDisabledByParent = useMemo(() => {
@@ -313,7 +456,7 @@ export function useDependentField(
     );
   }, [fieldConfig?.dependsOn, fieldSnapshot.parentValue]);
 
-  // Change handler (stable reference)
+  // Change handler (stable reference via useCallback)
   const handleChange = useCallback(
     (newValue: unknown) => store.setValue(fieldName, newValue),
     [store, fieldName],
@@ -345,14 +488,110 @@ export function useDependentField(
 }
 
 // ============================================================================
-// HOOKS - All Values
+// HOOKS - Selective Field Subscriptions
+// ============================================================================
+
+/**
+ * Subscribe to only the value of a field.
+ * More granular than useDependentField - doesn't include options.
+ *
+ * @example
+ * ```tsx
+ * function ValueDisplay({ fieldName }: { fieldName: string }) {
+ *   const value = useDependentValue(fieldName);
+ *   return <span>{String(value)}</span>;
+ * }
+ * ```
+ */
+export function useDependentValue(fieldName: string): unknown {
+  const store = useDependentStore();
+
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => store.subscribe(fieldName, onStoreChange),
+    [store, fieldName],
+  );
+
+  const getSnapshot = useCallback(
+    () => store.getFieldSnapshot(fieldName).value,
+    [store, fieldName],
+  );
+
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+/**
+ * Subscribe to only the loading state of a field.
+ *
+ * @example
+ * ```tsx
+ * function LoadingIndicator({ fieldName }: { fieldName: string }) {
+ *   const isLoading = useDependentLoading(fieldName);
+ *   return isLoading ? <Spinner /> : null;
+ * }
+ * ```
+ */
+export function useDependentLoading(fieldName: string): boolean {
+  const store = useDependentStore();
+
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => store.subscribe(fieldName, onStoreChange),
+    [store, fieldName],
+  );
+
+  const getSnapshot = useCallback(
+    () => store.getFieldSnapshot(fieldName).isLoading,
+    [store, fieldName],
+  );
+
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+/**
+ * Subscribe to only the parent value of a field.
+ * Useful when you need to react to parent changes without full field state.
+ *
+ * @example
+ * ```tsx
+ * function ParentValueWatcher({ fieldName }: { fieldName: string }) {
+ *   const parentValue = useDependentParentValue(fieldName);
+ *   // Fetch options based on parent value
+ *   const { data } = useQuery(['options', parentValue], ...);
+ * }
+ * ```
+ */
+export function useDependentParentValue(fieldName: string): unknown {
+  const store = useDependentStore();
+
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      const config = store.getConfig(fieldName);
+      if (!config?.dependsOn) {
+        // No parent - subscribe to self (will never trigger for parent changes)
+        return store.subscribe(fieldName, onStoreChange);
+      }
+      // Subscribe to parent field
+      return store.subscribe(config.dependsOn, onStoreChange);
+    },
+    [store, fieldName],
+  );
+
+  const getSnapshot = useCallback(
+    () => store.getFieldSnapshot(fieldName).parentValue,
+    [store, fieldName],
+  );
+
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+// ============================================================================
+// HOOKS - All Values (Use sparingly)
 // ============================================================================
 
 /**
  * Hook to get all field values.
  *
  * WARNING: This will re-render on ANY field change.
- * Prefer useDependentField for individual fields to avoid unnecessary re-renders.
+ * Prefer useDependentField or useDependentValue for individual fields.
  *
  * @returns Object containing all field values
  *
@@ -400,3 +639,6 @@ export function useDependentValues(): DependentFieldValues {
  * @deprecated Use UseDependentFieldResult instead
  */
 export type UseDependentFieldReturn = UseDependentFieldResult;
+
+// Legacy context export for backward compatibility
+export const DependentStoreContext = StoreContext;

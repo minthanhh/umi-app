@@ -36,11 +36,22 @@
 // ============================================================================
 
 export {
+  // Provider
   DependentSelectProvider,
+  // Field subscription hooks (optimized)
   useDependentField,
+  useDependentValue,
+  useDependentLoading,
+  useDependentParentValue,
+  useDependentValues,
+  // Store access hooks
   useDependentStore,
   useDependentStoreOptional,
-  useDependentValues,
+  // Context access hooks (Context Splitting)
+  useDependentActions,
+  useDependentConfig,
+  // Backward compatibility
+  DependentStoreContext,
 } from './context';
 
 export type {
