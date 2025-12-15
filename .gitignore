@@ -24,7 +24,7 @@ node_modules/
 /config/config.local.ts
 
 # Prisma
-/generated/prisma
+/generated
 
 # Cache
 .swc
@@ -76,7 +76,7 @@ Desktop.ini
 # Deployment
 .vercel
 .netlify
-api
+/api
 
 # Misc
 *.pem
