@@ -1,6 +1,10 @@
 import { defineConfig } from '@umijs/max';
+import path from 'path';
 
 export default defineConfig({
+  alias: {
+    lib: path.resolve(__dirname, 'lib'),
+  },
   mock: false,
   esbuildMinifyIIFE: true,
   apiRoute: {
