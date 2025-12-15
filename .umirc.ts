@@ -1,3 +1,4 @@
+import path from 'path';
 import { defineConfig } from '@umijs/max';
 
 export default defineConfig({
@@ -5,6 +6,10 @@ export default defineConfig({
   esbuildMinifyIIFE: true,
   apiRoute: {
     platform: 'vercel',
+  },
+
+  alias: {
+    lib: path.resolve(__dirname, 'lib'),
   },
 
   plugins: [require.resolve('./plugins/sw')],
