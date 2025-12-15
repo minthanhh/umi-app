@@ -76,7 +76,7 @@ Desktop.ini
 # Deployment
 .vercel
 .netlify
-/api
+# /api
 
 # Misc
 *.pem

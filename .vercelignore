@@ -1,1 +1,50 @@
+# Documentation
 README.md
+CHANGELOG.md
+LICENSE
+docs/
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Editor & IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Development configs
+.eslintrc*
+.prettierrc*
+.editorconfig
+tsconfig.json
+jest.config.*
+vitest.config.*
+
+# Testing
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+/coverage
+.nyc_output
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.circleci/
+Jenkinsfile
+
+# Docker (if not using)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Misc
+*.md
+!README.md
+.env.example
+CLAUDE.md
