@@ -24,7 +24,7 @@ node_modules/
 /config/config.local.ts
 
 # Prisma
-/generated
+# /generated
 
 # Cache
 .swc
