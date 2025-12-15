@@ -4,7 +4,7 @@ export default defineConfig({
   mock: false,
   esbuildMinifyIIFE: true,
   apiRoute: {
-    platform: 'netlify',
+    platform: 'vercel',
   },
 
   plugins: [require.resolve('./plugins/sw')],
