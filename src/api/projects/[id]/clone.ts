@@ -1,5 +1,5 @@
 import { UmiApiRequest, UmiApiResponse } from '@umijs/max';
-import prisma from 'lib/prisma';
+import prisma from '../../../../lib/prisma';
 
 // POST /api/projects/:id/clone - Clone a project with its tasks and members
 export default async function (req: UmiApiRequest, res: UmiApiResponse) {

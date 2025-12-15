@@ -1,5 +1,5 @@
 import { UmiApiRequest, UmiApiResponse } from '@umijs/max';
-import prisma from 'lib/prisma';
+import prisma from '../../../../lib/prisma';
 
 // GET /api/projects/:id/tasks - Get tasks for a specific project
 export default async function (req: UmiApiRequest, res: UmiApiResponse) {

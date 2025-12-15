@@ -1,4 +1,3 @@
-import path from 'path';
 import { defineConfig } from '@umijs/max';
 
 export default defineConfig({
@@ -6,11 +5,6 @@ export default defineConfig({
   esbuildMinifyIIFE: true,
   apiRoute: {
     platform: 'vercel',
-  },
-
-  alias: {
-    'lib/prisma': path.join(process.cwd(), 'lib/prisma.ts'),
-    lib: path.join(process.cwd(), 'lib'),
   },
 
   plugins: [require.resolve('./plugins/sw')],

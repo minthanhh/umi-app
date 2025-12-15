@@ -1,5 +1,5 @@
 import { UmiApiRequest, UmiApiResponse } from '@umijs/max';
-import prisma from 'lib/prisma';
+import prisma from '../../../../../lib/prisma';
 
 /**
  * Projects Options API
