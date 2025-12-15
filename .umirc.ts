@@ -9,7 +9,8 @@ export default defineConfig({
   },
 
   alias: {
-    lib: path.resolve(__dirname, 'lib'),
+    'lib/prisma': path.join(process.cwd(), 'lib/prisma.ts'),
+    lib: path.join(process.cwd(), 'lib'),
   },
 
   plugins: [require.resolve('./plugins/sw')],
