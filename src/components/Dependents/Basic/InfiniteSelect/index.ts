@@ -64,8 +64,6 @@ export { InfiniteDependentSelectField } from './InfiniteDependentSelectField';
 export { InfiniteSelectWrapper } from './InfiniteSelectWrapper';
 
 // Demo component (for reference/testing)
-export { InfiniteSelectDemo } from './InfiniteSelectDemo';
-
 // ============================================================================
 // HOOKS
 // ============================================================================

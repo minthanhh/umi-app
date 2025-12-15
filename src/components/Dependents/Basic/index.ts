@@ -176,8 +176,6 @@ export {
   InfiniteSelectWrapper,
   // Hook
   useInfiniteSelect,
-  // Demo
-  InfiniteSelectDemo,
 } from './InfiniteSelect';
 
 export type {

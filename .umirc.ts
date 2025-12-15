@@ -100,16 +100,6 @@ export default defineConfig({
           path: '/service-worker',
           component: './ServiceWorker',
         },
-        {
-          name: 'Formik Demo',
-          path: '/formik',
-          component: './FormikDemo',
-        },
-        {
-          name: 'RHF Demo',
-          path: '/rhf',
-          component: './RHFDemo',
-        },
       ],
     },
   ],
