@@ -226,6 +226,10 @@ export class DependentSelectStore {
   /**
    * Get snapshot for a field with structural sharing.
    * Returns cached value if dependencies unchanged.
+   *
+   * IMPORTANT: We check dependencies FIRST before version.
+   * This ensures same object reference is returned when actual data hasn't changed,
+   * preventing unnecessary re-renders when unrelated fields change.
    */
   getFieldSnapshot = (fieldName: string): DependentFieldSnapshot => {
     // Fast path: unknown field
@@ -240,9 +244,11 @@ export class DependentSelectStore {
       : undefined;
     const isLoading = this.loadingFieldNames.has(fieldName);
 
-    // Check cache validity
+    // Check cache - compare dependencies FIRST (not version)
+    // This ensures we return the same reference when data hasn't changed,
+    // even if storeVersion increased due to other field changes
     const cached = this.snapshotCache.get(fieldName);
-    if (cached && cached.version === this.storeVersion) {
+    if (cached) {
       const [cachedValue, cachedParent, cachedLoading] = cached.dependencies as [
         unknown,
         unknown,
@@ -253,11 +259,16 @@ export class DependentSelectStore {
         cachedParent === parentValue &&
         cachedLoading === isLoading
       ) {
+        // Dependencies match - return same reference to prevent re-render
+        // Update version for consistency (optional optimization)
+        if (cached.version !== this.storeVersion) {
+          cached.version = this.storeVersion;
+        }
         return cached.value;
       }
     }
 
-    // Compute new snapshot
+    // Dependencies changed - compute new snapshot
     const snapshot: DependentFieldSnapshot = {
       value: currentValue,
       parentValue,

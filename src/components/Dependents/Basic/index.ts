@@ -61,24 +61,6 @@ export type {
 } from './context';
 
 // ============================================================================
-// COMPONENTS
-// ============================================================================
-
-export { DependentSelectField } from './DependentSelectField';
-export { FormDependentSelectField } from './FormDependentSelectField';
-export { DependentFieldWrapper } from './DependentFieldWrapper';
-
-// Demo components (for reference/testing)
-export { DependentSelectDemo } from './DependentSelectDemo';
-export { RealApiDemo } from './RealApiDemo';
-
-export type { FormDependentSelectFieldProps } from './FormDependentSelectField';
-export type {
-  DependentFieldRenderProps,
-  DependentFieldWrapperProps,
-} from './DependentFieldWrapper';
-
-// ============================================================================
 // STORE
 // ============================================================================
 
