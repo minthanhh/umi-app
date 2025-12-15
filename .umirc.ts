@@ -110,11 +110,6 @@ export default defineConfig({
           path: '/rhf',
           component: './RHFDemo',
         },
-        {
-          name: 'Dependent Field',
-          path: '/dependent-field',
-          component: './DependentFieldDemo',
-        },
       ],
     },
   ],
