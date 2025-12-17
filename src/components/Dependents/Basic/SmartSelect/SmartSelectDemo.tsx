@@ -313,6 +313,7 @@ const fieldConfigs: DependentFieldConfig[] = [
 export function SmartSelectDemo() {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
+  console.log(queryClient)
 
   // Load saved selections on mount
   const {
