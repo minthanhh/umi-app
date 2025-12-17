@@ -2,7 +2,10 @@
   "extends": "./src/.umi/tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "lib/*": ["lib/*"]
+      "lib/*": ["lib/*"],
+      "@/*": [
+        "src/*"
+      ],
     }
   }
 }

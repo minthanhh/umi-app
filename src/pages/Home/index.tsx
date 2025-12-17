@@ -1,6 +1,4 @@
-import { InfiniteSelectDemo, RealApiDemo } from '@/components/Dependents/Basic';
 import { SmartSelectDemo } from '@/components/Dependents/Basic/SmartSelect';
-import MultipleDemo from '@/components/SmartSelect/examples/MultipleDemo';
 import { PageContainer } from '@ant-design/pro-components';
 import { Flex } from 'antd';
 import React from 'react';
@@ -10,6 +8,8 @@ const HomePage: React.FC = () => {
     <PageContainer>
       <Flex vertical gap="large">
         <SmartSelectDemo />
+        {/* <ReactHookFormDemo /> */}
+        {/* <FormikDemo /> */}
         {/* <InfiniteSelectDemo /> */}
         {/* <RealApiDemo /> */}
         {/* <DependentSelectDemo /> */}

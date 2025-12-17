@@ -237,6 +237,11 @@ function DependentWrapperInner({
   }
 
   // Render - use stableChildren to avoid unnecessary re-renders
+  // IMPORTANT: For value/onChange, we MUST use current children.props (not stableChildren.props)
+  // because React Hook Form's Controller provides new field.value/field.onChange on each render.
+  // Using stableChildren.props would cause stale closures.
+  const currentChildProps = isValidElement(children) ? (children.props as Record<string, unknown>) : {};
+
   const content =
     typeof stableChildren === 'function'
       ? stableChildren(injectedProps)
@@ -244,9 +249,9 @@ function DependentWrapperInner({
         ? React.cloneElement(stableChildren as React.ReactElement<any>, {
             ...injectedProps,
             // Don't override if child already has these props
-            value: (stableChildren.props as any).value ?? injectedProps.value,
-            onChange:
-              (stableChildren.props as any).onChange ?? injectedProps.onChange,
+            // Use currentChildProps for value/onChange to support controlled components (React Hook Form, etc.)
+            value: currentChildProps.value ?? injectedProps.value,
+            onChange: currentChildProps.onChange ?? injectedProps.onChange,
             disabled:
               (stableChildren.props as any).disabled ?? injectedProps.disabled,
             options:
