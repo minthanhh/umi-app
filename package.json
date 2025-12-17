@@ -1,5 +1,6 @@
 {
   "private": true,
+  "packageManager": "pnpm@10.24.0",
   "author": "thanh.ho <thanh.ho@kegmil.com>",
   "scripts": {
     "build": "prisma generate && max build",
