@@ -2,7 +2,7 @@
   "build": {
     "env": {
       "ENABLE_FILE_SYSTEM_API": "1",
-      "ENABLE_EXPERIMENTAL_COREPACK": 1
+      "ENABLE_EXPERIMENTAL_COREPACK": "1"
     }
   }
 }
