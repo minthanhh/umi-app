@@ -119,33 +119,76 @@ export type ParentValue<T extends string | number = string | number> =
 // ============================================================================
 
 /**
+ * Helper to normalize dependsOn to array format.
+ * Exported for use in store and other modules.
+ *
+ * @param dependsOn - Single parent name, array of parent names, or undefined
+ * @returns Array of parent names (empty array if no dependencies)
+ *
+ * @example
+ * ```ts
+ * normalizeDependsOn('country');           // ['country']
+ * normalizeDependsOn(['country', 'state']); // ['country', 'state']
+ * normalizeDependsOn(undefined);           // []
+ * ```
+ */
+export function normalizeDependsOn(dependsOn: string | string[] | undefined): string[] {
+  if (!dependsOn) return [];
+  return Array.isArray(dependsOn) ? dependsOn : [dependsOn];
+}
+
+/**
  * Internal implementation of buildRelationshipMap.
  * Separated from memoization wrapper for clarity.
+ *
+ * Supports both single and multiple parent dependencies:
+ * - dependsOn: 'country' -> single parent
+ * - dependsOn: ['country', 'province'] -> multiple parents
+ *
+ * **Optimizations**:
+ * - Uses Set for O(1) duplicate detection (instead of O(c) includes())
+ * - Single Map allocation for children tracking
+ * - Converts to array only at the end
+ *
+ * Time Complexity: O(n × p) where n = configs, p = avg parents per config
+ * Space Complexity: O(n)
  */
 function buildRelationshipMapInternal(
   configs: DependentFieldConfig[],
 ): DependentRelationshipMap {
   const relationshipMap = new Map<string, DependentFieldRelationship>();
+  // Use Set for O(1) add with automatic deduplication
+  const childrenSets = new Map<string, Set<string>>();
 
-  // Single pass: Initialize and populate children in one loop
-  // First, create all entries
+  // Pass 1: Initialize all entries with empty Sets
   for (let i = 0; i < configs.length; i++) {
     const config = configs[i];
-    relationshipMap.set(config.name, {
-      parent: config.dependsOn ?? null,
-      children: [],
-    });
+    childrenSets.set(config.name, new Set());
   }
 
-  // Second pass: Populate children (can't combine due to forward references)
+  // Pass 2: Populate children using Set - O(1) add, auto-dedup
   for (let i = 0; i < configs.length; i++) {
     const config = configs[i];
     if (config.dependsOn) {
-      const parentRelationship = relationshipMap.get(config.dependsOn);
-      if (parentRelationship) {
-        parentRelationship.children.push(config.name);
+      const parentNames = normalizeDependsOn(config.dependsOn);
+      for (let j = 0; j < parentNames.length; j++) {
+        const parentName = parentNames[j];
+        const childrenSet = childrenSets.get(parentName);
+        if (childrenSet) {
+          childrenSet.add(config.name); // O(1), handles duplicates automatically
+        }
       }
     }
+  }
+
+  // Pass 3: Build final relationship map with arrays
+  for (let i = 0; i < configs.length; i++) {
+    const config = configs[i];
+    const childrenSet = childrenSets.get(config.name)!;
+    relationshipMap.set(config.name, {
+      parent: config.dependsOn ?? null,
+      children: childrenSet.size > 0 ? Array.from(childrenSet) : [],
+    });
   }
 
   return relationshipMap;

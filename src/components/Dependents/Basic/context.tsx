@@ -346,8 +346,18 @@ export interface UseDependentFieldResult {
   /** Current value from store */
   value: unknown;
 
-  /** Parent field's value (for dependent fields) */
+  /**
+   * Parent field's value (for dependent fields).
+   * - Single dependency: value of that parent field
+   * - Multiple dependencies: object { [fieldName]: value }
+   */
   parentValue: unknown;
+
+  /**
+   * Object containing all parent values.
+   * Only populated when dependsOn is an array.
+   */
+  parentValues?: Record<string, unknown>;
 
   /** Whether async options are loading */
   isLoading: boolean;
@@ -442,13 +452,30 @@ export function useDependentField(
   }, [store, fieldName, fieldSnapshot.parentValue, externalOptions]);
 
   // Check if disabled because parent has no value
+  // For multiple parents (dependsOn is array): disabled if ANY parent has no value
   const isDisabledByParent = useMemo(() => {
     // Not disabled if no parent dependency
     if (!fieldConfig?.dependsOn) return false;
 
     const parentVal = fieldSnapshot.parentValue;
 
-    // Disabled if parent is undefined, null, or empty array
+    // For multiple parents, parentValue is an object { [fieldName]: value }
+    if (
+      typeof parentVal === 'object' &&
+      parentVal !== null &&
+      !Array.isArray(parentVal)
+    ) {
+      // Check if ANY parent value is empty
+      const values = Object.values(parentVal as Record<string, unknown>);
+      return values.some(
+        (v) =>
+          v === undefined ||
+          v === null ||
+          (Array.isArray(v) && v.length === 0),
+      );
+    }
+
+    // Single parent: disabled if parent is undefined, null, or empty array
     return (
       parentVal === undefined ||
       parentVal === null ||
@@ -481,6 +508,7 @@ export function useDependentField(
     options: filteredOptions,
     value: fieldSnapshot.value,
     parentValue: fieldSnapshot.parentValue,
+    parentValues: fieldSnapshot.parentValues,
     isLoading: fieldSnapshot.isLoading,
     isDisabledByParent,
     onChange: handleChange,
@@ -569,8 +597,21 @@ export function useDependentParentValue(fieldName: string): unknown {
         // No parent - subscribe to self (will never trigger for parent changes)
         return store.subscribe(fieldName, onStoreChange);
       }
-      // Subscribe to parent field
-      return store.subscribe(config.dependsOn, onStoreChange);
+
+      // Subscribe to parent field(s)
+      const parentNames = Array.isArray(config.dependsOn)
+        ? config.dependsOn
+        : [config.dependsOn];
+
+      // Subscribe to all parent fields
+      const unsubscribes = parentNames.map((name) =>
+        store.subscribe(name, onStoreChange),
+      );
+
+      // Return cleanup function that unsubscribes from all
+      return () => {
+        unsubscribes.forEach((unsubscribe) => unsubscribe());
+      };
     },
     [store, fieldName],
   );

@@ -181,6 +181,7 @@ function DependentWrapperInner({
     options: storeOptions,
     value,
     parentValue,
+    parentValues,
     isLoading: storeLoading,
     isDisabledByParent,
     onChange,
@@ -220,12 +221,13 @@ function DependentWrapperInner({
       name,
       value,
       parentValue,
+      parentValues,
       onChange,
       isDisabledByParent: isDisabled,
       isLoading,
       hasDependency, // Add this to tell InfiniteWrapper if parent check is needed
     }),
-    [name, value, parentValue, onChange, isDisabled, isLoading, hasDependency],
+    [name, value, parentValue, parentValues, onChange, isDisabled, isLoading, hasDependency],
   );
 
   // Warn if no config found

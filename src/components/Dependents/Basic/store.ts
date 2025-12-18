@@ -33,6 +33,7 @@ import {
   cascadeDelete,
   createDescendantsGetter,
   filterOptionsByParent,
+  normalizeDependsOn,
 } from './utils';
 
 // ============================================================================
@@ -211,6 +212,7 @@ export class DependentSelectStore {
     this.configLookup = new Map(configs.map((c) => [c.name, c]));
     this.fieldNameSet = new Set(configs.map((c) => c.name));
     this.fieldRelationships = buildRelationshipMap(configs);
+    console.log(this.fieldRelationships)
 
     // Create memoized descendants getter
     this.getDescendantsOf = createDescendantsGetter(this.fieldRelationships);
@@ -230,6 +232,10 @@ export class DependentSelectStore {
    * IMPORTANT: We check dependencies FIRST before version.
    * This ensures same object reference is returned when actual data hasn't changed,
    * preventing unnecessary re-renders when unrelated fields change.
+   *
+   * For multiple dependencies (dependsOn is array):
+   * - parentValue: object containing all parent values { [fieldName]: value }
+   * - parentValues: same as parentValue (for explicit access)
    */
   getFieldSnapshot = (fieldName: string): DependentFieldSnapshot => {
     // Fast path: unknown field
@@ -239,10 +245,28 @@ export class DependentSelectStore {
 
     const config = this.configLookup.get(fieldName)!;
     const currentValue = this.fieldValues[fieldName];
-    const parentValue = config.dependsOn
-      ? this.fieldValues[config.dependsOn]
-      : undefined;
     const isLoading = this.loadingFieldNames.has(fieldName);
+
+    // Calculate parentValue based on dependsOn type
+    let parentValue: unknown;
+    let parentValues: Record<string, unknown> | undefined;
+
+    if (config.dependsOn) {
+      const parentNames = normalizeDependsOn(config.dependsOn);
+
+      if (parentNames.length === 1) {
+        // Single dependency - parentValue is the value directly
+        parentValue = this.fieldValues[parentNames[0]];
+      } else if (parentNames.length > 1) {
+        // Multiple dependencies - parentValue is an object
+        const values: Record<string, unknown> = {};
+        for (const name of parentNames) {
+          values[name] = this.fieldValues[name];
+        }
+        parentValue = values;
+        parentValues = values;
+      }
+    }
 
     // Check cache - compare dependencies FIRST (not version)
     // This ensures we return the same reference when data hasn't changed,
@@ -254,9 +278,13 @@ export class DependentSelectStore {
         unknown,
         boolean,
       ];
+
+      // For multiple parents, we need to deep compare the parentValues object
+      const parentValueEqual = this.areParentValuesEqual(cachedParent, parentValue);
+
       if (
         cachedValue === currentValue &&
-        cachedParent === parentValue &&
+        parentValueEqual &&
         cachedLoading === isLoading
       ) {
         // Dependencies match - return same reference to prevent re-render
@@ -272,6 +300,7 @@ export class DependentSelectStore {
     const snapshot: DependentFieldSnapshot = {
       value: currentValue,
       parentValue,
+      parentValues,
       isLoading,
     };
 
@@ -284,6 +313,30 @@ export class DependentSelectStore {
 
     return snapshot;
   };
+
+  /**
+   * Compare parentValue for caching purposes.
+   * Handles both single value and object (multiple parents).
+   */
+  private areParentValuesEqual(a: unknown, b: unknown): boolean {
+    if (a === b) return true;
+    if (a === null || b === null) return false;
+    if (typeof a !== 'object' || typeof b !== 'object') return false;
+
+    // Both are objects - compare keys and values
+    const aObj = a as Record<string, unknown>;
+    const bObj = b as Record<string, unknown>;
+    const aKeys = Object.keys(aObj);
+    const bKeys = Object.keys(bObj);
+
+    if (aKeys.length !== bKeys.length) return false;
+
+    for (const key of aKeys) {
+      if (aObj[key] !== bObj[key]) return false;
+    }
+
+    return true;
+  }
 
   /**
    * Get config for a field.
@@ -309,6 +362,9 @@ export class DependentSelectStore {
   /**
    * Get filtered options with caching.
    * Caches filtered result per parent value.
+   *
+   * For multiple dependencies (dependsOn is array):
+   * - parentValue passed to filterOptions will be object { [fieldName]: value }
    */
   getOptions = (
     fieldName: string,
@@ -326,14 +382,29 @@ export class DependentSelectStore {
       return rawOptions;
     }
 
+    // Calculate parentValue based on dependsOn type
+    let parentValue: unknown;
+    const parentNames = normalizeDependsOn(config.dependsOn);
+
+    if (parentNames.length === 1) {
+      // Single dependency
+      parentValue = this.fieldValues[parentNames[0]];
+    } else {
+      // Multiple dependencies - create object
+      const values: Record<string, unknown> = {};
+      for (const name of parentNames) {
+        values[name] = this.fieldValues[name];
+      }
+      parentValue = values;
+    }
+
     // Check filtered cache
-    const parentValue = this.fieldValues[config.dependsOn];
     const cached = this.filteredOptionsCache.get(fieldName);
 
     if (
       cached &&
       cached.version === this.storeVersion &&
-      cached.parentValue === parentValue &&
+      this.areParentValuesEqual(cached.parentValue, parentValue) &&
       cached.options === rawOptions
     ) {
       return cached.options;
@@ -571,6 +642,13 @@ export class DependentSelectStore {
   // PRIVATE - Cascade Delete (Optimized)
   // ============================================================================
 
+  /**
+   * Cascade delete descendants when a parent value changes.
+   *
+   * For fields with multiple parents (dependsOn is array):
+   * - Only clear child if ALL parents are empty
+   * - For cascade delete, combine all parent values
+   */
   private cascadeDeleteDescendants(
     fieldName: string,
     values: DependentFieldValues,
@@ -579,8 +657,9 @@ export class DependentSelectStore {
     const descendants = this.getDescendantsOf(fieldName);
 
     for (const descendant of descendants) {
-      const parentName = this.fieldRelationships.get(descendant)?.parent;
-      if (!parentName) continue;
+      const relationship = this.fieldRelationships.get(descendant);
+      const parentNames = relationship?.parent;
+      if (!parentNames) continue;
 
       const currentValue = values[descendant];
       if (currentValue === undefined || currentValue === null) continue;
@@ -590,10 +669,11 @@ export class DependentSelectStore {
         : true;
       if (!hasValue) continue;
 
-      const parentValues = this.normalizeToArray(values[parentName]);
+      // Collect all parent values (handle both single and multiple parents)
+      const allParentValues = this.collectParentValues(parentNames, values);
 
-      // Rule 1: Empty parent -> clear child
-      if (parentValues.length === 0) {
+      // Rule 1: ALL parents empty -> clear child
+      if (allParentValues.length === 0) {
         const clearedValue = Array.isArray(currentValue) ? [] : undefined;
         if (!areValuesEqual(currentValue, clearedValue)) {
           values[descendant] = clearedValue;
@@ -609,7 +689,7 @@ export class DependentSelectStore {
       if (hasParentValue) {
         const newValue = cascadeDelete(
           currentValue as string | number | (string | number)[] | null | undefined,
-          parentValues as (string | number)[],
+          allParentValues as (string | number)[],
           options,
         );
 
@@ -618,7 +698,7 @@ export class DependentSelectStore {
           changes.push({ name: descendant, value: newValue });
         }
       } else {
-        // Rule 3: No parentValue -> clear on parent change
+        // Rule 3: No parentValue in options -> clear on parent change
         const clearedValue = Array.isArray(currentValue) ? [] : undefined;
         if (!areValuesEqual(currentValue, clearedValue)) {
           values[descendant] = clearedValue;
@@ -626,6 +706,31 @@ export class DependentSelectStore {
         }
       }
     }
+  }
+
+  /**
+   * Collect all parent values from single or multiple parents.
+   * Returns a flat array of all parent values.
+   */
+  private collectParentValues(
+    parentNames: string | string[] | null,
+    values: DependentFieldValues,
+  ): unknown[] {
+    if (!parentNames) return [];
+
+    const names = Array.isArray(parentNames) ? parentNames : [parentNames];
+    const result: unknown[] = [];
+
+    for (const name of names) {
+      const value = values[name];
+      if (Array.isArray(value)) {
+        result.push(...value);
+      } else if (value !== null && value !== undefined) {
+        result.push(value);
+      }
+    }
+
+    return result;
   }
 
   private normalizeToArray(value: unknown): unknown[] {
@@ -691,6 +796,13 @@ export class DependentSelectStore {
   // PRIVATE - Async Options
   // ============================================================================
 
+  /**
+   * Initialize async options for fields with function-based options.
+   *
+   * For multiple parents (dependsOn is array):
+   * - Only load if ALL parents have values
+   * - parentValue passed to options function will be object { [fieldName]: value }
+   */
   private initializeAsyncOptions(): void {
     for (const config of this.fieldConfigs) {
       if (typeof config.options !== 'function') continue;
@@ -698,9 +810,29 @@ export class DependentSelectStore {
       if (!config.dependsOn) {
         this.loadAsyncOptions(config.name, null);
       } else {
-        const parentValue = this.fieldValues[config.dependsOn];
-        if (parentValue !== null && parentValue !== undefined) {
-          this.loadAsyncOptions(config.name, parentValue);
+        const parentNames = normalizeDependsOn(config.dependsOn);
+
+        if (parentNames.length === 1) {
+          // Single dependency
+          const parentValue = this.fieldValues[parentNames[0]];
+          if (parentValue !== null && parentValue !== undefined) {
+            this.loadAsyncOptions(config.name, parentValue);
+          }
+        } else {
+          // Multiple dependencies - all must have value
+          const allHaveValue = parentNames.every((name) => {
+            const value = this.fieldValues[name];
+            return value !== null && value !== undefined;
+          });
+
+          if (allHaveValue) {
+            // Create object with all parent values
+            const parentValues: Record<string, unknown> = {};
+            for (const name of parentNames) {
+              parentValues[name] = this.fieldValues[name];
+            }
+            this.loadAsyncOptions(config.name, parentValues);
+          }
         }
       }
     }

@@ -245,8 +245,18 @@ export interface DependentContextValue {
   /** Giá trị của field */
   value: unknown;
 
-  /** Parent value */
+  /**
+   * Parent value.
+   * - Single dependency: value of that parent field
+   * - Multiple dependencies: object { [fieldName]: value }
+   */
   parentValue: unknown;
+
+  /**
+   * Object containing all parent values.
+   * Only populated when dependsOn is an array.
+   */
+  parentValues?: Record<string, unknown>;
 
   /** onChange handler */
   onChange: (value: unknown) => void;

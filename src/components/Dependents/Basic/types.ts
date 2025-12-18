@@ -362,8 +362,23 @@ export interface DependentFieldConfig {
   /** Chế độ select: undefined = single, 'multiple' = multi-select, 'tags' = tag mode */
   mode?: 'multiple' | 'tags';
 
-  /** Tên field cha mà field này phụ thuộc vào */
-  dependsOn?: string;
+  /**
+   * Tên field cha mà field này phụ thuộc vào.
+   * - Single string: phụ thuộc vào 1 field
+   * - Array of strings: phụ thuộc vào nhiều fields (tất cả các parent phải có giá trị)
+   *
+   * @example Single dependency
+   * ```ts
+   * { name: 'province', dependsOn: 'country' }
+   * ```
+   *
+   * @example Multiple dependencies
+   * ```ts
+   * // city phụ thuộc vào cả country và province
+   * { name: 'city', dependsOn: ['country', 'province'] }
+   * ```
+   */
+  dependsOn?: string | string[];
 
   /**
    * Nguồn options:
@@ -455,8 +470,18 @@ export interface DependentFieldSnapshot {
   /** Giá trị hiện tại của field */
   value: unknown;
 
-  /** Giá trị của field cha (undefined nếu không có parent) */
+  /**
+   * Giá trị của field cha (undefined nếu không có parent).
+   * - Nếu dependsOn là string: parentValue là giá trị của field đó
+   * - Nếu dependsOn là array: parentValue là object { [fieldName]: value }
+   */
   parentValue: unknown;
+
+  /**
+   * Object chứa giá trị của tất cả các parent fields.
+   * Chỉ có khi dependsOn là array.
+   */
+  parentValues?: Record<string, unknown>;
 
   /** Đang loading options hay không */
   isLoading: boolean;
@@ -466,8 +491,12 @@ export interface DependentFieldSnapshot {
  * Thông tin quan hệ cha-con của một field.
  */
 export interface DependentFieldRelationship {
-  /** Tên field cha (null nếu là root field) */
-  parent: string | null;
+  /**
+   * Tên field cha (null nếu là root field).
+   * - Single string: phụ thuộc vào 1 field
+   * - Array: phụ thuộc vào nhiều fields
+   */
+  parent: string | string[] | null;
 
   /** Danh sách tên các field con */
   children: string[];
@@ -599,7 +628,7 @@ export type SelectFieldProps = DependentSelectFieldProps;
  */
 export type ReadonlyFieldConfig<
   TName extends string = string,
-  TDependsOn extends string | undefined = string | undefined,
+  TDependsOn extends string | string[] | undefined = string | string[] | undefined,
 > = {
   readonly name: TName;
   readonly label?: string;
@@ -692,7 +721,8 @@ export type TypedFieldValues<TConfigs extends readonly ReadonlyFieldConfig[]> = 
  * const configs = defineConfigs([
  *   { name: 'country', ... },
  *   { name: 'province', dependsOn: 'country' }, // OK
- *   { name: 'city', dependsOn: 'state' }, // Error! 'state' doesn't exist
+ *   { name: 'city', dependsOn: ['country', 'province'] }, // OK - multiple deps
+ *   { name: 'ward', dependsOn: 'state' }, // Error! 'state' doesn't exist
  * ] as const);
  *
  * type Valid = ValidateDependencies<typeof configs>;
@@ -704,7 +734,11 @@ export type ValidateDependencies<TConfigs extends readonly ReadonlyFieldConfig[]
       ? TDeps extends TConfigs[number]['name']
         ? TConfigs[K]
         : never // dependsOn points to non-existent field
-      : TConfigs[K]
+      : TDeps extends readonly string[]
+        ? TDeps[number] extends TConfigs[number]['name']
+          ? TConfigs[K]
+          : never // one of dependsOn array points to non-existent field
+        : TConfigs[K]
     : never;
 };
 

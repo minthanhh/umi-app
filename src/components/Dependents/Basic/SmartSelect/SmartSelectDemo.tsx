@@ -1,9 +1,10 @@
 /**
- * SmartSelect Demo - User → Project → Task with Infinite Scroll
+ * SmartSelect Demo - User → Project → Task → Comment with Infinite Scroll
  *
  * Features:
- * - 3 cascading selects: User → Project → Task
+ * - 4 cascading selects: User → Project → Task, Comment (depends on User + Task)
  * - All selects use infinite scroll
+ * - Comment select demonstrates MULTIPLE parent dependencies (userIds AND taskIds)
  * - Selections are saved to database and restored on page load
  * - Uses SmartSelect compound components
  */
@@ -45,6 +46,16 @@ interface Task {
   [key: string]: unknown;
 }
 
+interface Comment {
+  id: number;
+  content: string;
+  authorId: number;
+  taskId: number;
+  author?: { id: number; name: string };
+  task?: { id: number; title: string };
+  [key: string]: unknown;
+}
+
 interface Filter {
   id: number;
   name: string;
@@ -56,6 +67,7 @@ interface Selections {
   userIds?: number[];
   projectIds?: number[];
   taskIds?: number[];
+  commentIds?: number[];
   [key: string]: unknown;
 }
 
@@ -245,6 +257,56 @@ async function fetchFiltersByIds(ids: Array<string | number>): Promise<Filter[]>
 }
 
 /**
+ * Fetch comments with cursor pagination (depends on userIds AND taskIds)
+ */
+async function fetchComments(request: FetchRequest): Promise<FetchResponse<Comment>> {
+  const { current, pageSize, parentValue, search } = request;
+
+  // parentValue is an object { userIds: [...], taskIds: [...] } for multiple dependencies
+  const parents = parentValue as { userIds?: number[]; taskIds?: number[] } | undefined;
+  const userIds = parents?.userIds || [];
+  const taskIds = parents?.taskIds || [];
+
+  // Need at least one parent to have values
+  if (!userIds.length && !taskIds.length) {
+    return { data: [], hasMore: false };
+  }
+
+  const cacheKey = `comments-${userIds.join(',')}-${taskIds.join(',')}-${search || ''}`;
+  const cursors = getCursorCache(cacheKey);
+  const cursor = current > 1 ? cursors.get(current - 1) : undefined;
+
+  const params = new URLSearchParams({ limit: String(pageSize) });
+  if (userIds.length) params.set('authorId', userIds.join(','));
+  if (taskIds.length) params.set('taskId', taskIds.join(','));
+  if (cursor) params.set('cursor', cursor);
+  if (search) params.set('keyword', search);
+
+  const res = await fetch(`/api/v2/comments/options?${params}`);
+  const data = await res.json();
+
+  if (data.pageInfo?.endCursor) {
+    cursors.set(current, data.pageInfo.endCursor);
+  }
+
+  return {
+    data: data.data || [],
+    total: data.pageInfo?.total,
+    hasMore: data.pageInfo?.hasNextPage ?? false,
+  };
+}
+
+/**
+ * Fetch comments by IDs (hydration)
+ */
+async function fetchCommentsByIds(ids: Array<string | number>): Promise<Comment[]> {
+  if (!ids.length) return [];
+  const res = await fetch(`/api/v2/comments/options?ids=${ids.join(',')}`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+/**
  * Load saved selections from API
  */
 async function loadSelections(): Promise<Selections | null> {
@@ -298,11 +360,11 @@ const fieldConfigs: DependentFieldConfig[] = [
     dependsOn: 'projectIds',
   },
   {
-    name: 'testIds',
-    label: 'Tests - Tasks',
-    placeholder: 'Select tasks...',
+    name: 'commentIds',
+    label: 'Comments',
+    placeholder: 'Select comments...',
     mode: 'multiple',
-    dependsOn: 'taskIds',
+    dependsOn: ['userIds', 'taskIds'],
   },
 ];
 
@@ -383,7 +445,8 @@ export function SmartSelectDemo() {
     <Card>
       <Title level={4}>SmartSelect Demo</Title>
       <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
-        User → Project → Task cascading selects with infinite scroll.
+        User → Project → Task → Comment cascading selects with infinite scroll.
+        Comment depends on BOTH Users AND Tasks (multiple parent dependencies).
         Selections are saved to database and restored on page reload.
       </Text>
 
@@ -465,13 +528,35 @@ export function SmartSelectDemo() {
             </SmartSelect.Dependent>
           </Form.Item>
 
-          <Form.Item name="testIds" label="Tasks">
-            <SmartSelect.Dependent name="testIds" options={[{ label: "Test - Task 1", value: "test-task1", parentValue: [84] }]}>
+          {/* Comment Select - Depends on userIds AND taskIds */}
+          <Form.Item name="commentIds" label="Comments (depends on Users + Tasks)">
+            <SmartSelect.Dependent name="commentIds">
+              <SmartSelect.Infinite
+                queryKey="comments"
+                fetchList={fetchComments}
+                fetchByIds={fetchCommentsByIds}
+                pageSize={10}
+                getItemId={(item) => (item as unknown as Comment).id}
+                getItemLabel={(item) => {
+                  const comment = item as unknown as Comment;
+                  const authorName = comment.author?.name || `User ${comment.authorId}`;
+                  const taskTitle = comment.task?.title || `Task ${comment.taskId}`;
+                  const contentPreview = comment.content.length > 30
+                    ? `${comment.content.slice(0, 30)}...`
+                    : comment.content;
+                  return `${contentPreview} (by ${authorName} on ${taskTitle})`;
+                }}
+                getItemParentValue={(item) => {
+                  const comment = item as unknown as Comment;
+                  return { userIds: [comment.authorId], taskIds: [comment.taskId] };
+                }}
+              >
                 <Select
                   mode="multiple"
-                  placeholder="Select tasks..."
+                  placeholder="Select comments..."
                   style={{ width: '100%' }}
                 />
+              </SmartSelect.Infinite>
             </SmartSelect.Dependent>
           </Form.Item>
 
