@@ -15,6 +15,9 @@ export type { InfiniteWrapperProps, InfiniteInjectedProps } from './InfiniteWrap
 export { StaticWrapper } from './StaticWrapper';
 export type { StaticWrapperProps, StaticInjectedProps, StaticOption } from './StaticWrapper';
 
+export { FieldWrapper } from './FieldWrapper';
+export type { FieldWrapperProps, FieldInjectedProps } from './FieldWrapper';
+
 // ============================================================================
 // COMPOUND COMPONENT
 // ============================================================================
@@ -22,6 +25,7 @@ export type { StaticWrapperProps, StaticInjectedProps, StaticOption } from './St
 import { DependentWrapper } from './DependentWrapper';
 import { InfiniteWrapper } from './InfiniteWrapper';
 import { StaticWrapper } from './StaticWrapper';
+import { FieldWrapper } from './FieldWrapper';
 
 /**
  * XSelect compound component.
@@ -48,4 +52,5 @@ export const XSelect = {
   Dependent: DependentWrapper,
   Infinite: InfiniteWrapper,
   Static: StaticWrapper,
+  Field: FieldWrapper,
 };

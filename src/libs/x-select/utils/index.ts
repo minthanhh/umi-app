@@ -453,12 +453,6 @@ export function cascadeDelete<
   const optionsLookup = getOptionsLookup(options);
   const remainingSet = new Set<TParent>(remainingParentValues);
 
-  console.log({
-    currentValue,
-    remainingSet,
-    optionsLookup
-  })
-
   const shouldRemoveOption = (optionValue: TValue): boolean => {
     const option = optionsLookup.get(optionValue);
     if (!option) return false;

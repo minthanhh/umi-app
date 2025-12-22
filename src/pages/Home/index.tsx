@@ -1,4 +1,4 @@
-import { SmartSelectDemo } from '@/components/Dependents/Basic/SmartSelect';
+import XSelectIntegrationDemo from '@/libs/x-dynamic-form/examples/XSelectIntegrationDemo';
 import XSelectDemo from '@/libs/x-select/examples';
 import { PageContainer } from '@ant-design/pro-components';
 import { Flex } from 'antd';
@@ -10,13 +10,7 @@ const HomePage: React.FC = () => {
       <Flex vertical gap="large">
         <XSelectDemo />
         {/* <SmartSelectDemo /> */}
-        {/* <ReactHookFormDemo /> */}
-        {/* <FormikDemo /> */}
-        {/* <InfiniteSelectDemo /> */}
-        {/* <RealApiDemo /> */}
-        {/* <DependentSelectDemo /> */}
-        {/* <AntdFormDemo /> */}
-        {/* <MultipleDemo /> */}
+        {/* <XSelectIntegrationDemo /> */}
       </Flex>
     </PageContainer>
   );

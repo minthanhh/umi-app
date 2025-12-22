@@ -7,6 +7,7 @@ export {
   DependentWrapper,
   InfiniteWrapper,
   StaticWrapper,
+  FieldWrapper,
   DependentContext,
   useDependentContext,
 } from './wrappers';
@@ -19,6 +20,8 @@ export type {
   StaticWrapperProps,
   StaticInjectedProps,
   StaticOption,
+  FieldWrapperProps,
+  FieldInjectedProps,
 } from './wrappers';
 
 // Error Recovery Components

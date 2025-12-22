@@ -141,7 +141,6 @@ export class XSelectStore {
     this.configLookup = new Map(configs.map((c) => [c.name, c]));
     this.fieldNameSet = new Set(configs.map((c) => c.name));
     this.fieldRelationships = buildRelationshipMap(configs);
-    console.log({fieldRelationships: this.fieldRelationships})
     this.getDescendantsOf = createDescendantsGetter(this.fieldRelationships);
 
     // Initialize async options

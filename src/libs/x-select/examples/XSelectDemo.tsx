@@ -10,11 +10,24 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@umijs/max';
-import { Button, Card, Form, message, Select, Space, Spin, Tag, Typography } from 'antd';
+import { Button, Card, Form, Input, InputNumber, message, Select, Space, Spin, Tag, Typography } from 'antd';
 import { useEffect, useMemo } from 'react';
 
-import { XSelectProvider, XSelect, ErrorDisplay, XSelectErrorBoundary } from '../index';
+import {
+  XSelectProvider,
+  XSelect,
+  ErrorDisplay,
+  XSelectErrorBoundary,
+  enableXSelectDevTools,
+  useXSelectStore,
+  useXSelectDevTools,
+} from '../index';
 import type { FieldConfig, FormAdapter, FetchRequest, FetchResponse, StaticOption } from '../index';
+
+// Enable DevTools globally (only in development)
+if (process.env.NODE_ENV === 'development') {
+  enableXSelectDevTools({ name: 'XSelect Demo' });
+}
 
 const { Title, Text } = Typography;
 
@@ -416,7 +429,12 @@ const fieldConfigs: FieldConfig[] = [
     mode: 'multiple',
     dependsOn: ['userIds', 'taskIds'],
   },
-  // Static dependent fields
+  // Static fields
+  {
+    name: 'priority',
+    label: 'Priority',
+    placeholder: 'Select priority...',
+  },
   {
     name: 'status',
     label: 'Status',
@@ -428,7 +446,28 @@ const fieldConfigs: FieldConfig[] = [
     placeholder: 'Select sub status...',
     dependsOn: 'status',
   },
+  // Field wrapper examples (non-select fields)
+  {
+    name: 'description',
+    label: 'Description',
+    dependsOn: 'status',
+  },
+  {
+    name: 'amount',
+    label: 'Amount',
+    dependsOn: 'priority',
+  },
 ];
+
+// ============================================================================
+// DevTools Connector - Must be inside XSelectProvider
+// ============================================================================
+
+function DevToolsConnector() {
+  const store = useXSelectStore();
+  useXSelectDevTools(store, 'XSelectDemo');
+  return null;
+}
 
 // ============================================================================
 // Main Demo Component
@@ -538,6 +577,7 @@ export function XSelectDemo() {
           adapter={adapter}
           initialValues={savedSelections || {}}
         >
+          <DevToolsConnector />
           <Form form={form} layout="vertical">
           {/* User Select - Infinite with Error Recovery UI */}
           <Form.Item name="userIds" label="Users (with Error Recovery UI)">
@@ -690,50 +730,52 @@ export function XSelectDemo() {
 
           {/* Priority Select - Static with metadata */}
           <Form.Item name="priority" label="Priority (Static with metadata)">
-            <XSelect.Static options={priorityOptions}>
-              {({ options, getOption, onChange, value }) => (
-                <Select
-                  value={value}
-                  onChange={onChange}
-                  options={options}
-                  placeholder="Select priority..."
-                  style={{ width: '100%' }}
-                  allowClear
-                  tagRender={({ value: tagValue, closable, onClose }) => {
-                    const opt = getOption(tagValue as string);
-                    return (
-                      <Tag
-                        color={opt?.color}
-                        closable={closable}
-                        onClose={onClose}
-                        style={{ marginRight: 3 }}
-                      >
-                        {opt?.label}
-                      </Tag>
-                    );
-                  }}
-                  optionRender={(option) => {
-                    const opt = getOption(option.value as string);
-                    return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            backgroundColor: opt?.color,
-                          }}
-                        />
-                        <span>{opt?.label}</span>
-                        <span style={{ color: '#999', fontSize: 12 }}>
-                          {opt?.description}
-                        </span>
-                      </div>
-                    );
-                  }}
-                />
-              )}
-            </XSelect.Static>
+            <XSelect.Dependent name="priority">
+              <XSelect.Static options={priorityOptions}>
+                {({ options, getOption, onChange, value }) => (
+                  <Select
+                    value={value}
+                    onChange={onChange}
+                    options={options}
+                    placeholder="Select priority..."
+                    style={{ width: '100%' }}
+                    allowClear
+                    tagRender={({ value: tagValue, closable, onClose }) => {
+                      const opt = getOption(tagValue as string);
+                      return (
+                        <Tag
+                          color={opt?.color}
+                          closable={closable}
+                          onClose={onClose}
+                          style={{ marginRight: 3 }}
+                        >
+                          {opt?.label}
+                        </Tag>
+                      );
+                    }}
+                    optionRender={(option) => {
+                      const opt = getOption(option.value as string);
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              backgroundColor: opt?.color,
+                            }}
+                          />
+                          <span>{opt?.label}</span>
+                          <span style={{ color: '#999', fontSize: 12 }}>
+                            {opt?.description}
+                          </span>
+                        </div>
+                      );
+                    }}
+                  />
+                )}
+              </XSelect.Static>
+            </XSelect.Dependent>
           </Form.Item>
 
           {/* Status Select - Static simple (parent of subStatus) */}
@@ -809,6 +851,64 @@ export function XSelectDemo() {
                 />
               )}
             </XSelect.Static>
+          </Form.Item>
+
+          {/* ============================================================ */}
+          {/* XSelect.Field Examples - Non-Select Fields with Dependencies */}
+          {/* ============================================================ */}
+
+          {/* Description - TextArea depends on Status */}
+          <Form.Item name="description" label="Description (depends on Status - using XSelect.Field)">
+            <XSelect.Field name="description">
+              {({ value, onChange, disabled, parentValue }) => (
+                <Input.TextArea
+                  value={value as string}
+                  onChange={(e) => onChange(e.target.value)}
+                  disabled={disabled}
+                  placeholder={
+                    !parentValue
+                      ? 'Please select a status first...'
+                      : parentValue === 'active'
+                        ? 'Describe what is currently being worked on...'
+                        : parentValue === 'pending'
+                          ? 'Describe what is being waited for...'
+                          : parentValue === 'completed'
+                            ? 'Describe the completion summary...'
+                            : 'Describe the cancellation reason...'
+                  }
+                  rows={3}
+                  style={{ width: '100%' }}
+                />
+              )}
+            </XSelect.Field>
+          </Form.Item>
+
+          {/* Amount - InputNumber depends on Priority */}
+          <Form.Item name="amount" label="Amount (depends on Priority - using XSelect.Field)">
+            <XSelect.Field name="amount">
+              {({ value, onChange, disabled, parentValue }) => {
+                // Get priority level from meta
+
+                console.log({parentValue})
+                const priority = priorityOptions.find(p => p.value === parentValue);
+                const minAmount = priority?.meta?.level ? priority.meta.level * 100 : 0;
+
+                return (
+                  <InputNumber
+                    value={value as number}
+                    onChange={onChange}
+                    disabled={disabled}
+                    placeholder={disabled ? 'Select priority first' : `Min: ${minAmount}`}
+                    min={minAmount}
+                    max={10000}
+                    step={100}
+                    style={{ width: '100%' }}
+                    prefix={priority ? `Level ${priority.meta?.level}: ` : ''}
+                    suffix={parentValue ? String(parentValue).toUpperCase() : undefined}
+                  />
+                );
+              }}
+            </XSelect.Field>
           </Form.Item>
 
           {/* Actions */}

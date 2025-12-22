@@ -201,13 +201,18 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
   const value = (valueProp ?? dependentContext?.value) as SelectValue;
   const isDisabledByParent = dependentContext?.isDisabledByParent ?? false;
 
-  // Use onChangeProp if provided, otherwise use context onChange
-  // Don't call both to avoid double updates
+  // Call BOTH onChangeProp and context onChange
+  // - onChangeProp: syncs value to external form (e.g., Antd Form via dynamic-form)
+  // - dependentContext.onChange: syncs value to XSelectStore for cascading
+  // This ensures proper cascading behavior when used with XSelectProvider
   const handleChange = (newValue: SelectValue) => {
+    // Always sync to store first (for cascading to work)
+    if (dependentContext?.onChange) {
+      dependentContext.onChange(newValue);
+    }
+    // Then notify external form
     if (onChangeProp) {
       onChangeProp(newValue);
-    } else {
-      dependentContext?.onChange(newValue);
     }
   };
 

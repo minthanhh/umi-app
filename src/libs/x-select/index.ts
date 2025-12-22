@@ -154,6 +154,7 @@ export {
   DependentWrapper,
   InfiniteWrapper,
   StaticWrapper,
+  FieldWrapper,
 
   // Context
   DependentContext,
@@ -171,6 +172,8 @@ export type {
   StaticWrapperProps,
   StaticInjectedProps,
   StaticOption,
+  FieldWrapperProps,
+  FieldInjectedProps,
 
   // Error types
   ErrorDisplayProps,
@@ -212,3 +215,20 @@ export {
   isEmpty,
   clearCaches,
 } from './utils/index';
+
+// ============================================================================
+// DEVTOOLS
+// ============================================================================
+
+export {
+  enableXSelectDevTools,
+  disableXSelectDevTools,
+  isDevToolsEnabled,
+  connectStoreToDevTools,
+  disconnectStoreFromDevTools,
+  sendToDevTools,
+  logXSelectState,
+  useXSelectDevTools,
+} from './devtools';
+
+export type { EnableDevToolsOptions, DevToolsOptions, DevToolsAction } from './devtools';
