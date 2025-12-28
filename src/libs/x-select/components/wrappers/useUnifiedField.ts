@@ -27,7 +27,6 @@ export interface UseUnifiedFieldResult {
   value: unknown;
   parentValue: unknown;
   parentValues?: Record<string, unknown>;
-  isLoading: boolean;
   isDisabledByParent: boolean;
   isRegistered: boolean;
   onChange: (value: unknown) => void;
@@ -42,7 +41,6 @@ const EMPTY_OPTIONS: XSelectOption[] = [];
 const EMPTY_SNAPSHOT: FieldSnapshot = Object.freeze({
   value: undefined,
   parentValue: undefined,
-  isLoading: false,
 });
 
 // ============================================================================
@@ -104,9 +102,9 @@ export function useUnifiedField(
   const fieldConfig = store.getConfig(fieldName);
   const isRegistered = fieldConfig !== undefined;
 
-  const filteredOptions = isRegistered
-    ? store.getOptions(fieldName, externalOptions) || EMPTY_OPTIONS
-    : EMPTY_OPTIONS;
+  // Options are now managed by components (InfiniteWrapper, StaticWrapper) directly
+  // This hook only provides external options if passed
+  const resolvedOptions = externalOptions ?? EMPTY_OPTIONS;
 
   const hasDependency = !!fieldConfig?.dependsOn;
   const isDisabledByParent = checkDisabledByParent(
@@ -121,11 +119,10 @@ export function useUnifiedField(
 
   return {
     config: fieldConfig,
-    options: filteredOptions,
+    options: resolvedOptions,
     value: snapshot.value,
     parentValue: snapshot.parentValue,
     parentValues: snapshot.parentValues,
-    isLoading: snapshot.isLoading,
     isDisabledByParent,
     isRegistered,
     onChange,

@@ -16,7 +16,6 @@ export {
   useXSelectConfig,
   useXSelectField,
   useXSelectValue,
-  useXSelectLoading,
   useXSelectParentValue,
   useXSelectValues,
   // Context (for advanced usage)

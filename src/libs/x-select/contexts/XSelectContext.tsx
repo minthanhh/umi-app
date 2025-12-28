@@ -289,9 +289,6 @@ export interface UseXSelectFieldResult {
   /** All parent values (when dependsOn is array) */
   parentValues?: Record<string, unknown>;
 
-  /** Loading state */
-  isLoading: boolean;
-
   /** Disabled by parent */
   isDisabledByParent: boolean;
 
@@ -305,14 +302,13 @@ export interface UseXSelectFieldResult {
  * @example
  * ```tsx
  * function CountrySelect() {
- *   const { options, value, onChange, isLoading } = useXSelectField('country');
+ *   const { options, value, onChange } = useXSelectField('country');
  *
  *   return (
  *     <Select
  *       value={value}
  *       onChange={onChange}
  *       options={options}
- *       loading={isLoading}
  *     />
  *   );
  * }
@@ -397,7 +393,6 @@ export function useXSelectField(
     value: fieldSnapshot.value,
     parentValue: fieldSnapshot.parentValue,
     parentValues: fieldSnapshot.parentValues,
-    isLoading: fieldSnapshot.isLoading,
     isDisabledByParent,
     onChange: handleChange,
   };
@@ -420,25 +415,6 @@ export function useXSelectValue(fieldName: string): unknown {
 
   const getSnapshot = useCallback(
     () => store.getFieldSnapshot(fieldName).value,
-    [store, fieldName],
-  );
-
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
-
-/**
- * Subscribe to only the loading state.
- */
-export function useXSelectLoading(fieldName: string): boolean {
-  const store = useXSelectStore();
-
-  const subscribe = useCallback(
-    (onStoreChange: () => void) => store.subscribe(fieldName, onStoreChange),
-    [store, fieldName],
-  );
-
-  const getSnapshot = useCallback(
-    () => store.getFieldSnapshot(fieldName).isLoading,
     [store, fieldName],
   );
 

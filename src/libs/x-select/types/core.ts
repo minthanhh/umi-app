@@ -137,9 +137,6 @@ export interface FieldSnapshot {
 
   /** All parent values (only when dependsOn is array) */
   parentValues?: Record<string, unknown>;
-
-  /** Loading state */
-  isLoading: boolean;
 }
 
 /**

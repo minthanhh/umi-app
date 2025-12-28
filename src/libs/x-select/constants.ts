@@ -19,7 +19,6 @@ export const EMPTY_OPTIONS: readonly XSelectOption[] = Object.freeze([]);
 export const EMPTY_SNAPSHOT: FieldSnapshot = Object.freeze({
   value: undefined,
   parentValue: undefined,
-  isLoading: false,
 });
 
 /**

@@ -148,7 +148,6 @@ export {
   // Field hooks
   useXSelectField,
   useXSelectValue,
-  useXSelectLoading,
   useXSelectParentValue,
   useXSelectValues,
 
@@ -264,20 +263,3 @@ export {
 } from './utils/index';
 
 export type { CircularDependencyResult } from './utils/index';
-
-// ============================================================================
-// DEVTOOLS
-// ============================================================================
-
-export {
-  enableXSelectDevTools,
-  disableXSelectDevTools,
-  isDevToolsEnabled,
-  connectStoreToDevTools,
-  disconnectStoreFromDevTools,
-  sendToDevTools,
-  logXSelectState,
-  useXSelectDevTools,
-} from './devtools';
-
-export type { EnableDevToolsOptions, DevToolsOptions, DevToolsAction } from './devtools';

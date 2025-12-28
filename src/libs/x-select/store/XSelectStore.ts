@@ -5,7 +5,7 @@
  * Designed for use with React's useSyncExternalStore.
  *
  * Architecture:
- * - Store manages: values, loading states, cascade logic via metadata
+ * - Store manages: values and cascade logic via metadata
  * - Form library is SOURCE OF TRUTH for values (via adapter)
  * - Adapter syncs store changes back to form
  * - Components (InfiniteWrapper, StaticWrapper) sync value metadata for cascade delete
@@ -15,7 +15,6 @@
  * - Dynamic mode: fields self-register at runtime via registerField()
  *
  * Cascade Delete Strategy (Metadata Snapshot):
- * - Instead of syncing full options to store (risky with infinite scroll/search)
  * - Components sync only metadata of SELECTED values: { value: parentValue }
  * - On parent change, store uses metadata to determine which child values to remove
  * - Lightweight and race-condition free
@@ -23,8 +22,6 @@
  * Optimizations:
  * - Computed state with lazy evaluation and structural sharing
  * - Batched notifications via microtask
- * - Request deduplication for async options
- * - Cached filtered options per parent value
  * - Batched field registration via RegistrationManager
  */
 
@@ -34,7 +31,6 @@ import type {
   FieldValues,
   FormAdapter,
   RelationshipMap,
-  XSelectOption,
   StoreListener,
   ValueMetadataMap,
   ValueMetadataEntry,
@@ -45,7 +41,6 @@ import {
   areValuesEqual,
   buildRelationshipMap,
   detectCircularDependency,
-  filterOptionsByParent,
   getDescendants,
   normalizeDependsOn,
 } from '../utils';
@@ -93,18 +88,6 @@ interface CachedComputed<T> {
   dependencies: unknown[];
 }
 
-interface OptionsCacheEntry {
-  options: XSelectOption[];
-  parentValue: unknown;
-  version: number;
-}
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const EMPTY_ARRAY: readonly XSelectOption[] = Object.freeze([]);
-
 // ============================================================================
 // STORE CLASS
 // ============================================================================
@@ -135,8 +118,6 @@ const EMPTY_ARRAY: readonly XSelectOption[] = Object.freeze([]);
 export class XSelectStore {
   // State
   private fieldValues: FieldValues;
-  private loadingFieldNames: ReadonlySet<string> = new Set();
-  private asyncOptionsCache = new Map<string, XSelectOption[]>();
   private storeVersion = 0;
 
   // Value metadata for cascade delete (only stores parentValue of selected values)
@@ -152,16 +133,12 @@ export class XSelectStore {
   private fieldSubscribers = new Map<string, Set<StoreListener>>();
   private eventListeners = new Set<StoreEventListener>();
 
-  // Caching
+  // Caching for snapshots
   private snapshotCache = new Map<string, CachedComputed<FieldSnapshot>>();
-  private filteredOptionsCache = new Map<string, OptionsCacheEntry>();
 
   // Batching
   private pendingNotifications = new Set<string>();
   private isNotificationScheduled = false;
-
-  // Request deduplication
-  private pendingRequests = new Map<string, Promise<XSelectOption[]>>();
 
   // Adapter & lifecycle
   private formAdapter?: FormAdapter;
@@ -193,7 +170,6 @@ export class XSelectStore {
         this.configs.set(config.name, config);
       }
       this.rebuildRelationships();
-      this.initializeAsyncOptions();
     }
   }
 
@@ -300,12 +276,7 @@ export class XSelectStore {
         // Clean up related state
         delete this.fieldValues[fieldName];
         this.snapshotCache.delete(fieldName);
-        this.filteredOptionsCache.delete(fieldName);
-        this.asyncOptionsCache.delete(fieldName);
         this.valueMetadataMap.delete(fieldName);
-        this.loadingFieldNames = new Set(
-          [...this.loadingFieldNames].filter((n) => n !== fieldName),
-        );
       }
     }
 
@@ -328,14 +299,6 @@ export class XSelectStore {
 
       this.storeVersion++;
       this.rebuildRelationships();
-
-      // Initialize async options for new fields
-      for (const fieldName of addedNames) {
-        const config = this.configs.get(fieldName);
-        if (config && typeof config.options === 'function') {
-          this.initializeAsyncOptionsForField(fieldName);
-        }
-      }
 
       // Emit events
       if (addedNames.length > 0) {
@@ -405,7 +368,6 @@ export class XSelectStore {
 
     const config = this.configs.get(fieldName)!;
     const currentValue = this.fieldValues[fieldName];
-    const isLoading = this.loadingFieldNames.has(fieldName);
 
     // Calculate parentValue
     let parentValue: unknown;
@@ -429,18 +391,16 @@ export class XSelectStore {
     // Check cache
     const cached = this.snapshotCache.get(fieldName);
     if (cached) {
-      const [cachedValue, cachedParent, cachedLoading] = cached.dependencies as [
+      const [cachedValue, cachedParent] = cached.dependencies as [
         unknown,
         unknown,
-        boolean,
       ];
 
       const parentValueEqual = this.areParentValuesEqual(cachedParent, parentValue);
 
       if (
         cachedValue === currentValue &&
-        parentValueEqual &&
-        cachedLoading === isLoading
+        parentValueEqual
       ) {
         if (cached.version !== this.storeVersion) {
           cached.version = this.storeVersion;
@@ -454,13 +414,12 @@ export class XSelectStore {
       value: currentValue,
       parentValue,
       parentValues,
-      isLoading,
     };
 
     this.snapshotCache.set(fieldName, {
       value: snapshot,
       version: this.storeVersion,
-      dependencies: [currentValue, parentValue, isLoading],
+      dependencies: [currentValue, parentValue],
     });
 
     return snapshot;
@@ -507,63 +466,6 @@ export class XSelectStore {
    */
   getValues = (): FieldValues => {
     return this.fieldValues;
-  };
-
-  /**
-   * Get filtered options.
-   */
-  getOptions = (
-    fieldName: string,
-    externalOptions?: XSelectOption[],
-  ): XSelectOption[] => {
-    const config = this.configs.get(fieldName);
-    if (!config) return EMPTY_ARRAY as XSelectOption[];
-
-    const rawOptions = this.resolveOptions(fieldName, externalOptions);
-    if (rawOptions.length === 0) return EMPTY_ARRAY as XSelectOption[];
-
-    // Root field - no filtering
-    if (!config.dependsOn) {
-      return rawOptions;
-    }
-
-    // Calculate parentValue
-    let parentValue: unknown;
-    const parentNames = normalizeDependsOn(config.dependsOn);
-
-    if (parentNames.length === 1) {
-      parentValue = this.fieldValues[parentNames[0]];
-    } else {
-      const values: Record<string, unknown> = {};
-      for (const name of parentNames) {
-        values[name] = this.fieldValues[name];
-      }
-      parentValue = values;
-    }
-
-    // Check cache
-    const cached = this.filteredOptionsCache.get(fieldName);
-
-    if (
-      cached &&
-      cached.version === this.storeVersion &&
-      this.areParentValuesEqual(cached.parentValue, parentValue) &&
-      cached.options === rawOptions
-    ) {
-      return cached.options;
-    }
-
-    // Filter options
-    const filterFn = config.filterOptions ?? filterOptionsByParent;
-    const filtered = filterFn(rawOptions, parentValue);
-
-    this.filteredOptionsCache.set(fieldName, {
-      options: filtered,
-      parentValue,
-      version: this.storeVersion,
-    });
-
-    return filtered;
   };
 
   // ============================================================================
@@ -791,41 +693,11 @@ export class XSelectStore {
     this.fieldSubscribers.clear();
     this.eventListeners.clear();
     this.snapshotCache.clear();
-    this.filteredOptionsCache.clear();
-    this.pendingRequests.clear();
-    this.asyncOptionsCache.clear();
     this.valueMetadataMap.clear();
     this.configs.clear();
     this.fieldRelationships.clear();
     this.descendantsCache.clear();
   };
-
-  // ============================================================================
-  // PRIVATE - Options Resolution
-  // ============================================================================
-
-  /**
-   * Resolve options for a field.
-   * Used only for getOptions() - NOT for cascade delete (which uses metadata).
-   */
-  private resolveOptions(
-    fieldName: string,
-    externalOptions?: XSelectOption[],
-  ): XSelectOption[] {
-    // External options passed directly (from component props)
-    if (externalOptions) return externalOptions;
-
-    const config = this.configs.get(fieldName);
-    if (!config) return EMPTY_ARRAY as XSelectOption[];
-
-    // Async options from cache
-    if (typeof config.options === 'function') {
-      return this.asyncOptionsCache.get(fieldName) ?? (EMPTY_ARRAY as XSelectOption[]);
-    }
-
-    // Static options from config
-    return config.options ?? (EMPTY_ARRAY as XSelectOption[]);
-  }
 
   // ============================================================================
   // PRIVATE - Cascade Delete (using Metadata Snapshot)
@@ -1092,93 +964,5 @@ export class XSelectStore {
         adapter.onFieldChange(name, value);
       }
     });
-  }
-
-  // ============================================================================
-  // PRIVATE - Async Options
-  // ============================================================================
-
-  private initializeAsyncOptions(): void {
-    for (const [fieldName, config] of this.configs) {
-      if (typeof config.options !== 'function') continue;
-      this.initializeAsyncOptionsForField(fieldName);
-    }
-  }
-
-  private initializeAsyncOptionsForField(fieldName: string): void {
-    const config = this.configs.get(fieldName);
-    if (!config || typeof config.options !== 'function') return;
-
-    if (!config.dependsOn) {
-      this.loadAsyncOptions(fieldName, null);
-    } else {
-      const parentNames = normalizeDependsOn(config.dependsOn);
-
-      if (parentNames.length === 1) {
-        const parentValue = this.fieldValues[parentNames[0]];
-        if (parentValue !== null && parentValue !== undefined) {
-          this.loadAsyncOptions(fieldName, parentValue);
-        }
-      } else {
-        const allHaveValue = parentNames.every((name) => {
-          const value = this.fieldValues[name];
-          return value !== null && value !== undefined;
-        });
-
-        if (allHaveValue) {
-          const parentValues: Record<string, unknown> = {};
-          for (const name of parentNames) {
-            parentValues[name] = this.fieldValues[name];
-          }
-          this.loadAsyncOptions(fieldName, parentValues);
-        }
-      }
-    }
-  }
-
-  private async loadAsyncOptions(
-    fieldName: string,
-    parentValue: unknown,
-  ): Promise<void> {
-    if (this.isDestroyed) return;
-
-    const config = this.configs.get(fieldName);
-    if (!config || typeof config.options !== 'function') return;
-
-    const cacheKey = `${fieldName}:${JSON.stringify(parentValue)}`;
-
-    if (this.pendingRequests.has(cacheKey)) return;
-
-    // Set loading
-    this.loadingFieldNames = new Set([...this.loadingFieldNames, fieldName]);
-    this.storeVersion++;
-    this.scheduleNotifications([fieldName]);
-
-    const request = config.options(parentValue);
-    this.pendingRequests.set(cacheKey, request);
-
-    try {
-      const options = await request;
-      if (this.isDestroyed) return;
-
-      this.asyncOptionsCache.set(fieldName, options);
-      this.storeVersion++;
-    } catch (error) {
-      if (this.isDestroyed) return;
-
-      console.error(`[XSelectStore] Failed to load options for "${fieldName}":`, error);
-      this.asyncOptionsCache.set(fieldName, []);
-    } finally {
-      if (this.isDestroyed) return;
-
-      this.pendingRequests.delete(cacheKey);
-
-      const newLoading = new Set(this.loadingFieldNames);
-      newLoading.delete(fieldName);
-      this.loadingFieldNames = newLoading;
-
-      this.storeVersion++;
-      this.scheduleNotifications([fieldName]);
-    }
   }
 }
