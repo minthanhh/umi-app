@@ -15,8 +15,6 @@ export type {
   FieldRelationship,
   RelationshipMap,
   StoreListener,
-  TypedOption,
-  TypedOptionWithParent,
   SelectValue,
   ValueMetadataEntry,
   ValueMetadataMap,
@@ -30,11 +28,6 @@ export type {
   ErrorState,
   AsyncState,
   OptionsAsyncState,
-  StoreEventType,
-  FieldEvent,
-  AllFieldEvents,
-  StoreEventPayloadMap,
-  StoreEventListener,
 } from './async';
 
 export { AsyncStateHelpers } from './async';

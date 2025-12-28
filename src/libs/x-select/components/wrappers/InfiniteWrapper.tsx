@@ -62,7 +62,7 @@
  * ```
  */
 
-import React, { isValidElement, useCallback, useEffect, useMemo } from 'react';
+import React, { isValidElement, useCallback, useMemo, useRef } from 'react';
 import type { ReactElement } from 'react';
 
 import { useXSelectStore } from '../../contexts';
@@ -74,8 +74,72 @@ import type {
   ItemAccessors,
   ListQueryConfig,
   SelectValue,
+  ValueMetadataMap,
 } from '../../types';
 import { buildMetadataFromOptions, isMetadataEmpty } from '../../utils/metadata';
+
+// ============================================================================
+// STABLE OPTIONS CACHE
+// ============================================================================
+
+interface FormattedOption {
+  label: string;
+  value: string | number;
+}
+
+/**
+ * Creates stable formatted options by reusing object references when possible.
+ * This prevents unnecessary re-renders in Select components that use reference equality.
+ */
+function useStableFormattedOptions<T extends BaseItem>(
+  options: InfiniteOption<T>[],
+): FormattedOption[] {
+  const cacheRef = useRef<Map<string | number, FormattedOption>>(new Map());
+  const prevResultRef = useRef<FormattedOption[]>([]);
+
+  return useMemo(() => {
+    const cache = cacheRef.current;
+    const result: FormattedOption[] = [];
+    let hasChanged = options.length !== prevResultRef.current.length;
+
+    for (let i = 0; i < options.length; i++) {
+      const opt = options[i];
+      const cached = cache.get(opt.value);
+
+      if (cached && cached.label === opt.label) {
+        // Reuse existing object reference
+        result.push(cached);
+        if (!hasChanged && prevResultRef.current[i] !== cached) {
+          hasChanged = true;
+        }
+      } else {
+        // Create new object and cache it
+        const newOption: FormattedOption = { label: opt.label, value: opt.value };
+        cache.set(opt.value, newOption);
+        result.push(newOption);
+        hasChanged = true;
+      }
+    }
+
+    // Clean up stale cache entries periodically (when cache is 2x larger than needed)
+    if (cache.size > options.length * 2) {
+      const currentValues = new Set(options.map(o => o.value));
+      for (const key of cache.keys()) {
+        if (!currentValues.has(key)) {
+          cache.delete(key);
+        }
+      }
+    }
+
+    // Return previous result if nothing changed (stable reference)
+    if (!hasChanged) {
+      return prevResultRef.current;
+    }
+
+    prevResultRef.current = result;
+    return result;
+  }, [options]);
+}
 
 // ============================================================================
 // TYPES
@@ -238,30 +302,71 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
     enabled: isQueryEnabled,
   });
 
-  // Format options for Select component
-  const formattedOptions = useMemo(
-    () =>
-      infiniteResult.options.map((opt) => ({
-        label: opt.label,
-        value: opt.value,
-      })),
-    [infiniteResult.options],
-  );
+  // Format options for Select component with stable references
+  const formattedOptions = useStableFormattedOptions(infiniteResult.options);
 
-  // Current metadata for selected values (for hydration sync)
-  const selectedValuesMetadata = useMemo(
-    () => buildMetadataFromOptions(value, infiniteResult.options),
-    [value, infiniteResult.options],
-  );
+  // Maintain a stable Map of options for O(1) metadata lookup
+  // This prevents race conditions when options array changes during selection
+  const optionsMapRef = useRef<Map<string | number, InfiniteOption<T>>>(new Map());
+
+  // Keep optionsMap in sync with options array
+  useMemo(() => {
+    const map = optionsMapRef.current;
+    // Add new options (don't clear - preserve metadata for previously seen options)
+    for (const opt of infiniteResult.options) {
+      map.set(opt.value, opt);
+    }
+    // Cleanup: limit map size to prevent unbounded growth
+    if (map.size > infiniteResult.options.length * 3) {
+      const currentValues = new Set(infiniteResult.options.map(o => o.value));
+      for (const key of map.keys()) {
+        if (!currentValues.has(key)) {
+          map.delete(key);
+        }
+      }
+    }
+  }, [infiniteResult.options]);
+
+  // Track previous hydration state to detect when hydration completes
+  const prevIsHydratingRef = useRef(infiniteResult.isHydrating);
+  const hasHydrationCompletedRef = useRef(false);
 
   // Enhanced onChange that syncs metadata BEFORE notifying form
+  // Uses optionsMapRef for stable lookup even if options array is stale
   const handleChange = useCallback(
     (newValue: SelectValue) => {
       // Sync metadata IMMEDIATELY when value changes
-      // This ensures metadata is available before any cascade delete
-      if (name) {
-        const newMetadata = buildMetadataFromOptions(newValue, infiniteResult.options);
-        if (!isMetadataEmpty(newMetadata)) {
+      // Use optionsMapRef for stable lookup - prevents race condition when
+      // user selects an item that was fetched via search but not yet in main list
+      if (name && newValue !== undefined && newValue !== null) {
+        const selectedValues = Array.isArray(newValue) ? newValue : [newValue];
+        const newMetadata: ValueMetadataMap = {};
+        let hasMetadata = false;
+
+        for (const val of selectedValues) {
+          const option = optionsMapRef.current.get(val as string | number);
+          if (option?.parentValue !== undefined) {
+            // Normalize parentValue to match ValueMetadataEntry type
+            const pv = option.parentValue;
+            if (
+              typeof pv === 'string' ||
+              typeof pv === 'number' ||
+              Array.isArray(pv) ||
+              (typeof pv === 'object' && pv !== null)
+            ) {
+              newMetadata[val as string | number] = {
+                parentValue: pv as string | number | (string | number)[] | Record<string, unknown>,
+              };
+              hasMetadata = true;
+            }
+          } else if (option) {
+            // Option exists but no parentValue - still track it
+            newMetadata[val as string | number] = { parentValue: undefined };
+            hasMetadata = true;
+          }
+        }
+
+        if (hasMetadata) {
           store.setValueMetadata(name, newMetadata);
         }
       }
@@ -269,9 +374,20 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
       // Then notify the form
       onChange?.(newValue);
     },
-    [name, store, infiniteResult.options, onChange],
+    [name, store, onChange],
   );
 
+  // Sync metadata SYNCHRONOUSLY when hydration completes (not in effect)
+  // This ensures metadata is available before any cascade delete triggered by parent change
+  if (name && prevIsHydratingRef.current && !infiniteResult.isHydrating) {
+    // Hydration just completed - sync metadata immediately
+    const metadata = buildMetadataFromOptions(value, infiniteResult.options);
+    if (!isMetadataEmpty(metadata)) {
+      store.setValueMetadata(name, metadata);
+    }
+    hasHydrationCompletedRef.current = true;
+  }
+  prevIsHydratingRef.current = infiniteResult.isHydrating;
 
   // Build injected props
   const injectedProps: InfiniteInjectedProps<T> = {
@@ -291,17 +407,6 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
     onSearch: infiniteResult.onSearch,
     fetchNextPage: infiniteResult.fetchNextPage,
   };
-
-  // Sync metadata to store ONLY for hydration case
-  // When user selects from list, handleChange already syncs metadata
-  // This effect only runs when hydration completes (options fetched for existing values)
-  useEffect(() => {
-    // Only sync if we have hydrated options (not from user selection)
-    // isHydrating = false means hydration completed
-    if (name && !infiniteResult.isHydrating && !isMetadataEmpty(selectedValuesMetadata)) {
-      store.setValueMetadata(name, selectedValuesMetadata);
-    }
-  }, [store, name, infiniteResult.isHydrating, selectedValuesMetadata]);
 
   return typeof stableChildren === 'function'
     ? stableChildren(injectedProps)

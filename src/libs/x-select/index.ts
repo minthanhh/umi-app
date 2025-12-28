@@ -86,9 +86,9 @@ export type {
   FieldRelationship,
   RelationshipMap,
   StoreListener,
-  TypedOption,
-  TypedOptionWithParent,
   SelectValue,
+  ValueMetadataEntry,
+  ValueMetadataMap,
 
   // Async state types
   IdleState,
@@ -97,9 +97,6 @@ export type {
   ErrorState,
   AsyncState,
   OptionsAsyncState,
-  FieldEvent,
-  AllFieldEvents,
-  StoreEventPayloadMap,
 
   // Infinite select types
   BaseItem,

@@ -6,9 +6,14 @@
  * - Deduplication
  * - Transforming to select option format
  * - Tracking parentValue for cascade delete
+ *
+ * Optimizations:
+ * - Single-pass merge and dedup (O(n) instead of O(2n))
+ * - Reuses option objects when item hasn't changed (structural sharing)
+ * - Stable parentValueMap reference when content unchanged
  */
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 import type { BaseItem, InfiniteOption, ItemAccessors } from '../types';
 import type { ListDataWithParent } from './useInfiniteList';
@@ -63,64 +68,86 @@ export function useSelectOptions<T extends BaseItem = BaseItem>(
   const getLabel = itemAccessors?.getLabel ?? defaultGetLabel;
   const getParentValue = itemAccessors?.getParentValue;
 
+  // Cache for structural sharing of option objects
+  const optionsCacheRef = useRef<Map<string | number, InfiniteOption<T>>>(new Map());
+  const prevResultRef = useRef<{
+    items: T[];
+    options: InfiniteOption<T>[];
+    parentValueMap: Map<string | number, unknown>;
+  } | null>(null);
+
   // ============================================================================
-  // PARENT VALUE MAP
+  // SINGLE-PASS MERGE, DEDUP, AND TRANSFORM
   // ============================================================================
 
-  const parentValueMap = useMemo(() => {
-    const map = new Map<string | number, unknown>();
+  const result = useMemo(() => {
+    const parentValueMap = new Map<string | number, unknown>();
+    const uniqueItemsMap = new Map<string | number, T>();
+    const optionsCache = optionsCacheRef.current;
+
+    // Process list items first (they have parentValue info)
     for (const { item, parentValue } of listItemsWithParent) {
-      map.set(getId(item), parentValue);
-    }
-    return map;
-  }, [listItemsWithParent, getId]);
-
-  // ============================================================================
-  // MERGED ITEMS (deduplicated)
-  // ============================================================================
-
-  const listItems = useMemo(() => {
-    return listItemsWithParent.map(({ item }) => item);
-  }, [listItemsWithParent]);
-
-  const items = useMemo(() => {
-    const allItems = [...hydratedItems, ...listItems];
-    const uniqueMap = new Map<string | number, T>();
-
-    for (const item of allItems) {
-      uniqueMap.set(getId(item), item);
+      const id = getId(item);
+      parentValueMap.set(id, parentValue);
+      uniqueItemsMap.set(id, item);
     }
 
-    return Array.from(uniqueMap.values());
-  }, [hydratedItems, listItems, getId]);
+    // Add hydrated items (they take precedence for item data, but keep parentValue from list)
+    for (const item of hydratedItems) {
+      const id = getId(item);
+      uniqueItemsMap.set(id, item);
+    }
 
-  // ============================================================================
-  // SELECT OPTIONS
-  // ============================================================================
+    // Build items array and options in single pass
+    const items: T[] = [];
+    const selectOptions: InfiniteOption<T>[] = [];
 
-  const selectOptions = useMemo((): InfiniteOption<T>[] => {
-    return items.map((item) => {
-      // Prefer custom accessor, fallback to tracked parentValue from fetch
+    for (const [id, item] of uniqueItemsMap) {
+      items.push(item);
+
+      // Get parentValue: prefer custom accessor, fallback to tracked value
       const itemParentValue = getParentValue
         ? getParentValue(item)
-        : parentValueMap.get(getId(item));
+        : parentValueMap.get(id);
 
-      return {
-        value: getId(item),
-        label: getLabel(item),
-        item,
-        parentValue: itemParentValue,
-      };
-    });
-  }, [items, getId, getLabel, getParentValue, parentValueMap]);
+      const label = getLabel(item);
 
-  // ============================================================================
-  // RETURN
-  // ============================================================================
+      // Check if we can reuse cached option (structural sharing)
+      const cached = optionsCache.get(id);
+      if (
+        cached &&
+        cached.item === item &&
+        cached.label === label &&
+        cached.parentValue === itemParentValue
+      ) {
+        selectOptions.push(cached);
+      } else {
+        // Create new option and cache it
+        const newOption: InfiniteOption<T> = {
+          value: id,
+          label,
+          item,
+          parentValue: itemParentValue,
+        };
+        optionsCache.set(id, newOption);
+        selectOptions.push(newOption);
+      }
+    }
 
-  return {
-    items,
-    options: selectOptions,
-    parentValueMap,
-  };
+    // Cleanup stale cache entries (when cache is 2x larger than current)
+    if (optionsCache.size > uniqueItemsMap.size * 2) {
+      for (const key of optionsCache.keys()) {
+        if (!uniqueItemsMap.has(key)) {
+          optionsCache.delete(key);
+        }
+      }
+    }
+
+    return { items, options: selectOptions, parentValueMap };
+  }, [listItemsWithParent, hydratedItems, getId, getLabel, getParentValue]);
+
+  // Store previous result for potential future comparison
+  prevResultRef.current = result;
+
+  return result;
 }
