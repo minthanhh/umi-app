@@ -274,6 +274,7 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
 
   ...restProps
 }: InfiniteWrapperProps<T>) {
+  console.log("InfiniteWrapper re-render", name);
   const stableChildren = useStableChildren(children);
   const store = useXSelectStore();
 

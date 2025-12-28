@@ -133,6 +133,7 @@ function DependentWrapperInner({
   children,
   ...restProps
 }: DependentWrapperProps) {
+  console.log("DependentWrapperInner re-render", name);
   const stableChildren = useStableChildren(children);
 
   // Auto-register if field not pre-configured (dynamic mode)

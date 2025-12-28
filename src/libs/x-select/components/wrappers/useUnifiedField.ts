@@ -9,7 +9,6 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 
-import { EMPTY_SNAPSHOT, isEmpty } from '../../constants';
 import { useXSelectStore } from '../../contexts';
 import type { FieldConfig, FieldSnapshot, XSelectOption } from '../../types';
 
@@ -40,9 +39,22 @@ export interface UseUnifiedFieldResult {
 
 const EMPTY_OPTIONS: XSelectOption[] = [];
 
+const EMPTY_SNAPSHOT: FieldSnapshot = Object.freeze({
+  value: undefined,
+  parentValue: undefined,
+  isLoading: false,
+});
+
 // ============================================================================
 // HELPERS
 // ============================================================================
+
+/** Check if value is empty (undefined, null, or empty array) */
+function isEmptyValue(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (Array.isArray(value) && value.length === 0) return true;
+  return false;
+}
 
 /** Check if field should be disabled based on parent value */
 function checkDisabledByParent(
@@ -59,11 +71,11 @@ function checkDisabledByParent(
 
   if (isMultipleParents) {
     const values = Object.values(parentValue as Record<string, unknown>);
-    return values.some(isEmpty);
+    return values.some(isEmptyValue);
   }
 
   // Single parent
-  return isEmpty(parentValue);
+  return isEmptyValue(parentValue);
 }
 
 // ============================================================================

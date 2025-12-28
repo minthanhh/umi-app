@@ -1082,13 +1082,16 @@ export class XSelectStore {
   private syncToForm(changes: FieldChange[]): void {
     if (!this.formAdapter) return;
 
-    if (this.formAdapter.onFieldsChange && changes.length > 1) {
-      this.formAdapter.onFieldsChange(changes);
-    } else {
+    // Defer form sync to next microtask to prevent Form re-render
+    // from happening during the same synchronous execution.
+    // This allows React to batch the store notifications first,
+    // then sync to form separately.
+    const adapter = this.formAdapter;
+    queueMicrotask(() => {
       for (const { name, value } of changes) {
-        this.formAdapter.onFieldChange(name, value);
+        adapter.onFieldChange(name, value);
       }
-    }
+    });
   }
 
   // ============================================================================
