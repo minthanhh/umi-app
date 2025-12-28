@@ -18,6 +18,8 @@ export type {
   TypedOption,
   TypedOptionWithParent,
   SelectValue,
+  ValueMetadataEntry,
+  ValueMetadataMap,
 } from './core';
 
 // Async state types
@@ -43,7 +45,10 @@ export type {
   InfiniteOption,
   FetchRequest,
   FetchResponse,
-  InfiniteConfig,
+  InfinitePageData,
+  ListQueryConfig,
+  HydrationQueryConfig,
+  ItemAccessors,
   UseInfiniteSelectResult,
   DependentInjectedProps,
   InfiniteInjectedProps,

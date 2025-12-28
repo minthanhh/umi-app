@@ -13,7 +13,7 @@
 .swc
 
 /generated/prisma
-# /api
+/api
 .vercel
 .env*.local
 

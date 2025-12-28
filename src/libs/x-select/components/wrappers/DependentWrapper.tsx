@@ -32,131 +32,91 @@
  * ```
  */
 
-import React, {
-  createContext,
-  isValidElement,
-  memo,
-  useContext,
-  useMemo,
-  useRef,
-} from 'react';
+import React, { createContext, isValidElement, memo, useContext, useMemo } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
-import { useXSelectField } from '../../contexts';
+import { RenderableChildren, useAutoRegistration, useStableChildren } from '../../hooks';
 import type { XSelectOption, FormattedOption, DependentContextValue } from '../../types';
-import { formatOptions } from '../../utils';
+import { useUnifiedField } from './useUnifiedField';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-/**
- * Props injected into children.
- */
+/** Props injected into children. */
 export interface DependentInjectedProps {
-  /** Current value */
   value: unknown;
-
-  /** Change handler */
   onChange: (value: unknown) => void;
-
-  /** Disabled by parent */
   disabled?: boolean;
-
-  /** Parent value(s) */
   parentValue?: unknown;
-
-  /** Filtered options */
   options?: FormattedOption[];
-
-  /** Loading state */
   loading?: boolean;
+  name: string
 }
 
-/**
- * Props for DependentWrapper.
- */
+/** Props for DependentWrapper. */
 export interface DependentWrapperProps {
   /** Field name (must match config in Provider) */
   name: string;
-
+  /** Parent field dependency (for auto-registration in dynamic mode) */
+  dependsOn?: string | string[];
   /** Display label */
   label?: ReactNode;
-
   /** Override disabled state */
   disabled?: boolean;
-
   /** External options (override config options) */
   options?: XSelectOption[];
-
   /** External loading state */
   loading?: boolean;
-
+  /** Selection mode */
+  mode?: 'multiple' | 'tags';
+  /** Placeholder text */
+  placeholder?: string;
   /** Children - ReactElement or render function */
-  children: ReactElement | ((props: DependentInjectedProps) => ReactNode);
+  children: RenderableChildren<DependentInjectedProps>;
 }
 
 // ============================================================================
 // CONTEXT
 // ============================================================================
 
-/**
- * Context for passing data to nested InfiniteWrapper.
- */
 export const DependentContext = createContext<DependentContextValue | null>(null);
 
-/**
- * Hook to get context from DependentWrapper (if nested).
- */
+/** Hook to get context from DependentWrapper (if nested). */
 export function useDependentContext(): DependentContextValue | null {
   return useContext(DependentContext);
 }
 
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-function areOptionsEqual(
-  a: XSelectOption[] | undefined,
-  b: XSelectOption[] | undefined,
-): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i].value !== b[i].value || a[i].label !== b[i].label) return false;
-  }
-  return true;
+/** Props that can be passed to children element. */
+interface ChildSelectProps {
+  value?: unknown;
+  onChange?: (value: unknown) => void;
+  disabled?: boolean;
+  options?: FormattedOption[];
+  loading?: boolean;
+  parentValue?: unknown;
+  mode?: 'multiple' | 'tags';
+  name: string
 }
 
-function areChildrenEqual(
-  a: DependentWrapperProps['children'],
-  b: DependentWrapperProps['children'],
-): boolean {
-  if (a === b) return true;
-
-  if (isValidElement(a) && isValidElement(b)) {
-    return a.type === b.type && a.key === b.key;
-  }
-
-  if (typeof a === 'function' && typeof b === 'function') {
-    return a === b;
-  }
-
-  return false;
-}
-
-function arePropsEqual(
-  prevProps: DependentWrapperProps,
-  nextProps: DependentWrapperProps,
-): boolean {
-  if (prevProps.name !== nextProps.name) return false;
-  if (prevProps.disabled !== nextProps.disabled) return false;
-  if (prevProps.loading !== nextProps.loading) return false;
-  if (!areOptionsEqual(prevProps.options, nextProps.options)) return false;
-  if (!areChildrenEqual(prevProps.children, nextProps.children)) return false;
-
-  return true;
+/** Clone element with merged props (child props take priority). */
+function cloneWithProps(
+  element: ReactElement<ChildSelectProps>,
+  injectedProps: DependentInjectedProps,
+  mode?: 'multiple' | 'tags',
+): ReactElement<ChildSelectProps> {
+  const childProps = element.props;
+  return React.cloneElement(element, {
+    ...childProps,
+    name: childProps.name ?? injectedProps.name,
+    value: childProps.value ?? injectedProps.value,
+    onChange: childProps.onChange ?? injectedProps.onChange,
+    disabled: childProps.disabled ?? injectedProps.disabled,
+    options: childProps.options ?? injectedProps.options,
+    loading: childProps.loading ?? injectedProps.loading,
+    parentValue: childProps.parentValue ?? injectedProps.parentValue,
+    mode: childProps.mode ?? mode,
+  });
 }
 
 // ============================================================================
@@ -165,26 +125,27 @@ function arePropsEqual(
 
 function DependentWrapperInner({
   name,
+  dependsOn,
+  mode,
   disabled: disabledProp,
   options: externalOptions,
   loading: externalLoading,
   children,
+  ...restProps
 }: DependentWrapperProps) {
-  const childrenRef = useRef(children);
+  const stableChildren = useStableChildren(children);
 
-  if (isValidElement(children) && isValidElement(childrenRef.current)) {
-    if (
-      children.type !== childrenRef.current.type ||
-      children.key !== childrenRef.current.key
-    ) {
-      childrenRef.current = children;
-    }
-  } else if (children !== childrenRef.current) {
-    childrenRef.current = children;
-  }
+  // Auto-register if field not pre-configured (dynamic mode)
+  const { isDynamicMode } = useAutoRegistration({
+    name,
+    dependsOn,
+    options: externalOptions,
+    mode,
+  });
 
-  const stableChildren = childrenRef.current;
-
+  // Get field state from store (Store is single source of truth)
+  // Form.Item may inject value/onChange but we ignore them
+  // Adapter handles Store → Form sync
   const {
     config: fieldConfig,
     options: storeOptions,
@@ -194,29 +155,26 @@ function DependentWrapperInner({
     isLoading: storeLoading,
     isDisabledByParent,
     onChange,
-  } = useXSelectField(name, { options: externalOptions });
+  } = useUnifiedField(name, { options: externalOptions });
 
-  const resolvedOptions = externalOptions ?? storeOptions;
+  // Resolve states
+  const loading = externalLoading ?? storeLoading;
+  const disabled = disabledProp || isDisabledByParent;
+  const options = externalOptions ?? storeOptions;
 
-  const formattedOptions = useMemo(
-    () => formatOptions(resolvedOptions),
-    [resolvedOptions],
-  );
-
-  const isLoading = externalLoading ?? storeLoading;
-  const isDisabled = disabledProp || isDisabledByParent;
-
+  // Build injected props
   const injectedProps: DependentInjectedProps = {
+    ...restProps,
+    name,
     value,
-    onChange,
-    disabled: isDisabled,
     parentValue,
-    options: formattedOptions,
-    loading: isLoading,
+    disabled,
+    options,
+    loading,
+    onChange,
   };
 
-  const hasDependency = !!fieldConfig?.dependsOn;
-
+  // Build context value for nested wrappers
   const contextValue: DependentContextValue = useMemo(
     () => ({
       name,
@@ -224,44 +182,27 @@ function DependentWrapperInner({
       parentValue,
       parentValues,
       onChange,
-      isDisabledByParent: isDisabled,
-      isLoading,
-      hasDependency,
+      isDisabledByParent: disabled,
+      isLoading: loading,
+      hasDependency: !!fieldConfig?.dependsOn,
     }),
-    [name, value, parentValue, parentValues, onChange, isDisabled, isLoading, hasDependency],
+    [name, value, parentValue, parentValues, onChange, disabled, loading, fieldConfig?.dependsOn],
   );
 
-  if (!fieldConfig) {
+  // Warn if field not found
+  if (!fieldConfig && !isDynamicMode) {
     console.warn(
       `[DependentWrapper] No config found for field "${name}". ` +
         'Make sure the field name matches a config in XSelectProvider.',
     );
   }
 
-  const currentChildProps = isValidElement(children)
-    ? (children.props as Record<string, unknown>)
-    : {};
-
+  // Render content
   const content =
     typeof stableChildren === 'function'
       ? stableChildren(injectedProps)
-      : isValidElement(stableChildren)
-        ? React.cloneElement(stableChildren as React.ReactElement<any>, {
-            ...injectedProps,
-            value: currentChildProps.value ?? injectedProps.value,
-            onChange: currentChildProps.onChange ?? injectedProps.onChange,
-            disabled:
-              (stableChildren.props as any).disabled ?? injectedProps.disabled,
-            options:
-              (stableChildren.props as any).options ?? injectedProps.options,
-            loading:
-              (stableChildren.props as any).loading ?? injectedProps.loading,
-            parentValue: injectedProps.parentValue,
-            mode: fieldConfig?.mode,
-            placeholder:
-              (stableChildren.props as any).placeholder ??
-              fieldConfig?.placeholder,
-          })
+      : isValidElement<ChildSelectProps>(stableChildren)
+        ? cloneWithProps(stableChildren, injectedProps, fieldConfig?.mode)
         : stableChildren;
 
   return (
@@ -271,6 +212,5 @@ function DependentWrapperInner({
   );
 }
 
-export const DependentWrapper = memo(DependentWrapperInner, arePropsEqual);
-
+export const DependentWrapper = memo(DependentWrapperInner);
 export default DependentWrapper;

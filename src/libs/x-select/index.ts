@@ -10,6 +10,9 @@
  * - Framework-agnostic types (no UI library dependency)
  * - Optimized with useSyncExternalStore
  * - Support for single and multiple parent dependencies
+ * - Auto-registration in dynamic mode
+ *
+ * ## Static Mode (configs provided upfront)
  *
  * @example Basic cascading select
  * ```tsx
@@ -23,6 +26,24 @@
  *   <CountrySelect />
  *   <ProvinceSelect />
  *   <CitySelect />
+ * </XSelectProvider>
+ * ```
+ *
+ * ## Dynamic Mode (fields self-register)
+ *
+ * @example Dynamic form with auto-registering fields
+ * ```tsx
+ * <XSelectProvider adapter={formAdapter}>
+ *   {schema.fields.map(field => (
+ *     <XSelect.Dependent
+ *       key={field.name}
+ *       name={field.name}
+ *       dependsOn={field.dependsOn}
+ *       options={field.options}
+ *     >
+ *       <Select />
+ *     </XSelect.Dependent>
+ *   ))}
  * </XSelectProvider>
  * ```
  *
@@ -76,18 +97,19 @@ export type {
   ErrorState,
   AsyncState,
   OptionsAsyncState,
-  StoreEventType,
   FieldEvent,
   AllFieldEvents,
   StoreEventPayloadMap,
-  StoreEventListener,
 
   // Infinite select types
   BaseItem,
   InfiniteOption,
   FetchRequest,
   FetchResponse,
-  InfiniteConfig,
+  InfinitePageData,
+  ListQueryConfig,
+  HydrationQueryConfig,
+  ItemAccessors,
   UseInfiniteSelectResult,
   DependentInjectedProps,
   InfiniteInjectedProps,
@@ -100,14 +122,22 @@ export { AsyncStateHelpers } from './types';
 // STORE
 // ============================================================================
 
-export { XSelectStore } from './store/XSelectStore';
+export { XSelectStore, RegistrationManager } from './store';
+export type {
+  StoreEventType,
+  StoreEvent,
+  StoreEventListener,
+  OnFlushCallback,
+  RegistrationManagerOptions,
+  RegistrationResult,
+} from './store';
 
 // ============================================================================
 // CONTEXT & HOOKS
 // ============================================================================
 
 export {
-  // Provider
+  // Provider (supports both static and dynamic modes)
   XSelectProvider,
 
   // Store hooks
@@ -127,20 +157,38 @@ export {
 
   // Context (advanced)
   XSelectStoreContext,
+
+  // Deprecated aliases (for backwards compatibility)
+  DynamicXSelectProvider,
+  useDynamicXSelectStore,
+  useDynamicXSelectStoreOptional,
+  useDynamicXSelectActions,
+  useDynamicXSelectConfig,
+  useDynamicXSelectField,
+  DynamicStoreContext,
 } from './contexts';
 
 export type {
   XSelectProviderProps,
   UseXSelectFieldOptions,
   UseXSelectFieldResult,
+
+  // Deprecated types (for backwards compatibility)
+  DynamicXSelectProviderProps,
+  UseDynamicXSelectFieldOptions,
+  UseDynamicXSelectFieldResult,
 } from './contexts';
 
 // ============================================================================
 // HOOKS
 // ============================================================================
 
-export { useInfiniteSelect } from './hooks';
-export type { UseInfiniteSelectOptions } from './hooks';
+export { useInfiniteSelect, useAutoRegistration } from './hooks';
+export type {
+  UseInfiniteSelectOptions,
+  UseAutoRegistrationOptions,
+  UseAutoRegistrationResult,
+} from './hooks';
 
 // ============================================================================
 // COMPONENTS
@@ -150,11 +198,10 @@ export {
   // Compound component
   XSelect,
 
-  // Individual wrappers
+  // Wrappers (work in both static and dynamic modes)
   DependentWrapper,
   InfiniteWrapper,
   StaticWrapper,
-  FieldWrapper,
 
   // Context
   DependentContext,
@@ -167,13 +214,12 @@ export {
 } from './components';
 
 export type {
+  // Wrapper props
   DependentWrapperProps,
   InfiniteWrapperProps,
   StaticWrapperProps,
   StaticInjectedProps,
   StaticOption,
-  FieldWrapperProps,
-  FieldInjectedProps,
 
   // Error types
   ErrorDisplayProps,
@@ -196,6 +242,10 @@ export {
   createDescendantsGetter,
   normalizeDependsOn,
 
+  // Circular dependency detection
+  detectCircularDependency,
+  validateNoCircularDependency,
+
   // Options filtering
   filterOptionsByParent,
   formatOptions,
@@ -215,6 +265,8 @@ export {
   isEmpty,
   clearCaches,
 } from './utils/index';
+
+export type { CircularDependencyResult } from './utils/index';
 
 // ============================================================================
 // DEVTOOLS

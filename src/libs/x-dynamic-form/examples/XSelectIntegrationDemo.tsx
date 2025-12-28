@@ -311,7 +311,9 @@ function CascadingXSelectDemo() {
       required: true,
       placeholder: 'Select country',
       queryKey: 'countries',
-      fetchList: fetchCountries,
+      listQuery: {
+        fetchFn: fetchCountries,
+      },
       showSearch: true,
     } as DynamicFormXSelectConfig,
     {
@@ -321,7 +323,9 @@ function CascadingXSelectDemo() {
       placeholder: 'Select province',
       dependsOn: 'country',
       queryKey: 'provinces',
-      fetchList: fetchProvinces,
+      listQuery: {
+        fetchFn: fetchProvinces,
+      },
       showSearch: true,
     } as DynamicFormXSelectConfig,
     {
@@ -331,7 +335,9 @@ function CascadingXSelectDemo() {
       placeholder: 'Select city',
       dependsOn: 'province',
       queryKey: 'cities',
-      fetchList: fetchCities,
+      listQuery: {
+        fetchFn: fetchCities,
+      },
       showSearch: true,
     } as DynamicFormXSelectConfig,
     {

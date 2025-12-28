@@ -1,33 +1,18 @@
 /**
- * XSelect Demo - User → Project → Task → Comment with Infinite Scroll
+ * XSelect Demo - Cascading Selects with Infinite Scroll
  *
- * Features:
- * - 4 cascading selects: User → Project → Task, Comment (depends on User + Task)
- * - All selects use infinite scroll
- * - Comment select demonstrates MULTIPLE parent dependencies (userIds AND taskIds)
- * - Selections are saved to database and restored on page load
- * - Uses XSelect compound components
+ * Demonstrates:
+ * - User → Project → Task cascading
+ * - Infinite scroll with cursor pagination
+ * - Hydration for selected values
  */
 
-import { useQuery, useMutation, useQueryClient } from '@umijs/max';
-import { Button, Card, Form, Input, InputNumber, message, Select, Space, Spin, Tag, Typography } from 'antd';
-import { useEffect, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button, Card, Form, message, Select, Space, Spin, Typography } from 'antd';
+import { useMemo } from 'react';
 
-import {
-  XSelectProvider,
-  XSelect,
-  ErrorDisplay,
-  XSelectErrorBoundary,
-  enableXSelectDevTools,
-  useXSelectStore,
-  useXSelectDevTools,
-} from '../index';
-import type { FieldConfig, FormAdapter, FetchRequest, FetchResponse, StaticOption } from '../index';
-
-// Enable DevTools globally (only in development)
-if (process.env.NODE_ENV === 'development') {
-  enableXSelectDevTools({ name: 'XSelect Demo' });
-}
+import { XSelectProvider, XSelect } from '../index';
+import type { FieldConfig, FormAdapter, InfinitePageData } from '../index';
 
 const { Title, Text } = Typography;
 
@@ -46,7 +31,6 @@ interface Project {
   id: number;
   name: string;
   ownerId: number;
-  members?: { userId: number }[];
   [key: string]: unknown;
 }
 
@@ -57,38 +41,20 @@ interface Task {
   [key: string]: unknown;
 }
 
-interface Comment {
-  id: number;
-  content: string;
-  authorId: number;
-  taskId: number;
-  author?: { id: number; name: string };
-  task?: { id: number; title: string };
-  [key: string]: unknown;
-}
-
-interface Filter {
-  id: number;
-  name: string;
-  page: string;
-  [key: string]: unknown;
-}
-
 interface Selections {
   userIds?: number[];
   projectIds?: number[];
   taskIds?: number[];
-  commentIds?: number[];
   [key: string]: unknown;
 }
 
 // ============================================================================
-// Cursor Cache - Track cursors for page-based to cursor-based conversion
+// Cursor Cache
 // ============================================================================
 
 const cursorCache = new Map<string, Map<number, string>>();
 
-function getCursorCache(key: string): Map<number, string> {
+function getCursors(key: string): Map<number, string> {
   if (!cursorCache.has(key)) {
     cursorCache.set(key, new Map());
   }
@@ -96,449 +62,199 @@ function getCursorCache(key: string): Map<number, string> {
 }
 
 // ============================================================================
-// API Functions - Using v2 cursor-based APIs
+// API Helpers
 // ============================================================================
 
-/**
- * Fetch users with cursor pagination
- * NOTE: First 2 calls will fail if SIMULATE_ERROR is true (to demo Error Recovery)
- */
-async function fetchUsers(request: FetchRequest): Promise<FetchResponse<User>> {
-  // Simulate error for first 2 requests to demo Error Recovery UI
-  const { current, pageSize, search } = request;
-  const cacheKey = `users-${search || ''}`;
-  const cursors = getCursorCache(cacheKey);
-  const cursor = current > 1 ? cursors.get(current - 1) : undefined;
+interface ApiResponse<T> {
+  data: T[];
+  pageInfo?: {
+    endCursor?: string;
+    hasNextPage?: boolean;
+    total?: number;
+  };
+}
 
-  const params = new URLSearchParams({ limit: String(pageSize) });
-  if (cursor) params.set('cursor', cursor);
-  if (search) params.set('keyword', search);
+async function fetchApi<T>(url: string): Promise<ApiResponse<T>> {
+  const res = await fetch(url);
+  return res.json();
+}
 
-  const res = await fetch(`/api/v2/users/options?${params}`);
-  const data = await res.json();
+function buildParams(params: Record<string, string | number | undefined>): URLSearchParams {
+  const urlParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined) urlParams.set(key, String(value));
+  });
+  return urlParams;
+}
 
-  if (res.ok) {
-    if (data.pageInfo?.endCursor) {
-      cursors.set(current, data.pageInfo.endCursor);
+// ============================================================================
+// Query Factories
+// ============================================================================
+
+function createListQueryFn<T>(
+  endpoint: string,
+  options?: {
+    parentField?: string;
+    getParentValue?: (parentValue: unknown) => string | undefined;
+  },
+) {
+  return async ({ pageParam = 1, queryKey }: { pageParam: number; queryKey: readonly unknown[] }): Promise<InfinitePageData<T>> => {
+    const [, , parentValue, search] = queryKey as [string, string, unknown, string];
+
+    // Get parent IDs if applicable
+    let parentIds: string | undefined;
+    if (options?.getParentValue) {
+      parentIds = options.getParentValue(parentValue);
+      if (options.parentField && !parentIds) {
+        return { data: [], nextPage: undefined, fetchedWithParentValue: parentValue };
+      }
+    }
+
+    // Build cache key and get cursor
+    const cacheKey = `${endpoint}-${parentIds || ''}-${search || ''}`;
+    const cursors = getCursors(cacheKey);
+    const cursor = pageParam > 1 ? cursors.get(pageParam - 1) : undefined;
+
+    // Build URL params
+    const params = buildParams({
+      limit: '10',
+      cursor,
+      keyword: search || undefined,
+      ...(options?.parentField && parentIds ? { parentField: options.parentField, parentValue: parentIds } : {}),
+    });
+
+    const response = await fetchApi<T>(`/api/v2/${endpoint}/options?${params}`);
+
+    // Cache cursor for next page
+    if (response.pageInfo?.endCursor) {
+      cursors.set(pageParam, response.pageInfo.endCursor);
     }
 
     return {
-      data: data.data || [],
-      total: data.pageInfo?.total,
-      hasMore: data.pageInfo?.hasNextPage ?? false,
+      data: response.data || [],
+      nextPage: response.pageInfo?.hasNextPage ? pageParam + 1 : undefined,
+      fetchedWithParentValue: parentValue,
     };
-  }
-
-  return data;
-}
-
-/**
- * Fetch users by IDs (hydration)
- */
-async function fetchUsersByIds(ids: Array<string | number>): Promise<User[]> {
-  if (!ids.length) return [];
-  const res = await fetch(`/api/v2/users/options?ids=${ids.join(',')}`);
-  const data = await res.json();
-  return data.data || [];
-}
-
-/**
- * Fetch projects with cursor pagination
- */
-async function fetchProjects(request: FetchRequest): Promise<FetchResponse<Project>> {
-  const { current, pageSize, parentValue, search } = request;
-
-  const userIds = Array.isArray(parentValue) ? parentValue : parentValue ? [parentValue] : [];
-  if (!userIds.length) return { data: [], hasMore: false };
-
-  // Pass all userIds as comma-separated string
-  const userIdsStr = userIds.join(',');
-  const cacheKey = `projects-${userIdsStr}-${search || ''}`;
-  const cursors = getCursorCache(cacheKey);
-  const cursor = current > 1 ? cursors.get(current - 1) : undefined;
-
-  const params = new URLSearchParams({
-    limit: String(pageSize),
-    parentField: 'memberId',
-    parentValue: userIdsStr,
-  });
-  if (cursor) params.set('cursor', cursor);
-  if (search) params.set('keyword', search);
-
-  const res = await fetch(`/api/v2/projects/options?${params}`);
-  const data = await res.json();
-
-  if (data.pageInfo?.endCursor) {
-    cursors.set(current, data.pageInfo.endCursor);
-  }
-
-  return {
-    data: data.data || [],
-    total: data.pageInfo?.total,
-    hasMore: data.pageInfo?.hasNextPage ?? false,
   };
 }
 
-/**
- * Fetch projects by IDs (hydration)
- */
-async function fetchProjectsByIds(ids: Array<string | number>): Promise<Project[]> {
-  if (!ids.length) return [];
-  const res = await fetch(`/api/v2/projects/options?ids=${ids.join(',')}`);
-  const data = await res.json();
-  return data.data || [];
-}
-
-/**
- * Fetch tasks with cursor pagination
- */
-async function fetchTasks(request: FetchRequest): Promise<FetchResponse<Task>> {
-  const { current, pageSize, parentValue, search } = request;
-
-  const projectIds = Array.isArray(parentValue) ? parentValue : parentValue ? [parentValue] : [];
-  if (!projectIds.length) return { data: [], hasMore: false };
-
-  // Pass all projectIds as comma-separated string
-  const projectIdsStr = projectIds.join(',');
-  const cacheKey = `tasks-${projectIdsStr}-${search || ''}`;
-  const cursors = getCursorCache(cacheKey);
-  const cursor = current > 1 ? cursors.get(current - 1) : undefined;
-
-  const params = new URLSearchParams({
-    limit: String(pageSize),
-    parentField: 'projectId',
-    parentValue: projectIdsStr,
-  });
-  if (cursor) params.set('cursor', cursor);
-  if (search) params.set('keyword', search);
-
-  const res = await fetch(`/api/v2/tasks/options?${params}`);
-  const data = await res.json();
-
-  if (data.pageInfo?.endCursor) {
-    cursors.set(current, data.pageInfo.endCursor);
-  }
-
-  return {
-    data: data.data || [],
-    total: data.pageInfo?.total,
-    hasMore: data.pageInfo?.hasNextPage ?? false,
+function createHydrationQueryFn<T>(endpoint: string) {
+  return async (_context: unknown, ids: Array<string | number>): Promise<T[]> => {
+    if (!ids.length) return [];
+    const response = await fetchApi<T>(`/api/v2/${endpoint}/options?ids=${ids.join(',')}`);
+    return response.data || [];
   };
 }
 
-/**
- * Fetch tasks by IDs (hydration)
- */
-async function fetchTasksByIds(ids: Array<string | number>): Promise<Task[]> {
-  if (!ids.length) return [];
-  const res = await fetch(`/api/v2/tasks/options?ids=${ids.join(',')}`);
-  const data = await res.json();
-  return data.data || [];
+// Helper to extract IDs from parent value
+function extractIds(value: unknown): string | undefined {
+  if (!value) return undefined;
+  const ids = Array.isArray(value) ? value : [value];
+  return ids.length > 0 ? ids.join(',') : undefined;
 }
 
-/**
- * Fetch filters with cursor pagination (no dependency)
- */
-async function fetchFilters(request: FetchRequest): Promise<FetchResponse<Filter>> {
-  const { current, pageSize, search } = request;
-  const cacheKey = `filters-${search || ''}`;
-  const cursors = getCursorCache(cacheKey);
-  const cursor = current > 1 ? cursors.get(current - 1) : undefined;
+// ============================================================================
+// Query Functions
+// ============================================================================
 
-  const params = new URLSearchParams({ limit: String(pageSize) });
-  if (cursor) params.set('cursor', cursor);
-  if (search) params.set('keyword', search);
+const userListQuery = createListQueryFn<User>('users');
+const userHydrationQuery = createHydrationQueryFn<User>('users');
 
-  const res = await fetch(`/api/v2/filters/options?${params}`);
-  const data = await res.json();
+const projectListQuery = createListQueryFn<Project>('projects', {
+  parentField: 'memberId',
+  getParentValue: extractIds,
+});
+const projectHydrationQuery = createHydrationQueryFn<Project>('projects');
 
-  if (data.pageInfo?.endCursor) {
-    cursors.set(current, data.pageInfo.endCursor);
-  }
+const taskListQuery = createListQueryFn<Task>('tasks', {
+  parentField: 'projectId',
+  getParentValue: extractIds,
+});
+const taskHydrationQuery = createHydrationQueryFn<Task>('tasks');
 
-  return {
-    data: data.data || [],
-    total: data.pageInfo?.total,
-    hasMore: data.pageInfo?.hasNextPage ?? false,
-  };
-}
+// ============================================================================
+// Selections API
+// ============================================================================
 
-/**
- * Fetch filters by IDs (hydration)
- */
-async function fetchFiltersByIds(ids: Array<string | number>): Promise<Filter[]> {
-  if (!ids.length) return [];
-  const res = await fetch(`/api/v2/filters/options?ids=${ids.join(',')}`);
-  const data = await res.json();
-  return data.data || [];
-}
-
-/**
- * Fetch comments with cursor pagination (depends on userIds AND taskIds)
- */
-async function fetchComments(request: FetchRequest): Promise<FetchResponse<Comment>> {
-  const { current, pageSize, parentValue, search } = request;
-
-  // parentValue is an object { userIds: [...], taskIds: [...] } for multiple dependencies
-  const parents = parentValue as { userIds?: number[]; taskIds?: number[] } | undefined;
-  const userIds = parents?.userIds || [];
-  const taskIds = parents?.taskIds || [];
-
-  // Need at least one parent to have values
-  if (!userIds.length && !taskIds.length) {
-    return { data: [], hasMore: false };
-  }
-
-  const cacheKey = `comments-${userIds.join(',')}-${taskIds.join(',')}-${search || ''}`;
-  const cursors = getCursorCache(cacheKey);
-  const cursor = current > 1 ? cursors.get(current - 1) : undefined;
-
-  const params = new URLSearchParams({ limit: String(pageSize) });
-  if (userIds.length) params.set('authorId', userIds.join(','));
-  if (taskIds.length) params.set('taskId', taskIds.join(','));
-  if (cursor) params.set('cursor', cursor);
-  if (search) params.set('keyword', search);
-
-  const res = await fetch(`/api/v2/comments/options?${params}`);
-  const data = await res.json();
-
-  if (data.pageInfo?.endCursor) {
-    cursors.set(current, data.pageInfo.endCursor);
-  }
-
-  return {
-    data: data.data || [],
-    total: data.pageInfo?.total,
-    hasMore: data.pageInfo?.hasNextPage ?? false,
-  };
-}
-
-/**
- * Fetch comments by IDs (hydration)
- */
-async function fetchCommentsByIds(ids: Array<string | number>): Promise<Comment[]> {
-  if (!ids.length) return [];
-  const res = await fetch(`/api/v2/comments/options?ids=${ids.join(',')}`);
-  const data = await res.json();
-  return data.data || [];
-}
-
-/**
- * Load saved selections from API
- */
 async function loadSelections(): Promise<Selections | null> {
   const res = await fetch('/api/selections?page=x-select-demo');
   const data = await res.json();
   return data.data;
 }
 
-/**
- * Save selections to API
- */
 async function saveSelections(selections: Selections): Promise<Selections> {
   const res = await fetch('/api/selections', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      page: 'x-select-demo',
-      selections,
-    }),
+    body: JSON.stringify({ page: 'x-select-demo', selections }),
   });
   const data = await res.json();
-  if (!data.success) {
-    throw new Error(data.error);
-  }
+  if (!data.success) throw new Error(data.error);
   return data.data;
 }
 
 // ============================================================================
-// Static Options - Small datasets with metadata
+// Scroll Handler
 // ============================================================================
 
-const priorityOptions: StaticOption<{ level: number }>[] = [
-  { label: 'Critical', value: 'critical', color: '#f5222d', description: 'Urgent attention required', meta: { level: 4 } },
-  { label: 'High', value: 'high', color: '#fa8c16', description: 'Important task', meta: { level: 3 } },
-  { label: 'Medium', value: 'medium', color: '#1890ff', description: 'Normal priority', meta: { level: 2 } },
-  { label: 'Low', value: 'low', color: '#52c41a', description: 'Can wait', meta: { level: 1 } },
-];
+const SCROLL_THRESHOLD = 50;
 
-const statusOptions: StaticOption[] = [
-  { label: 'Active', value: 'active', color: 'green', description: 'Currently active' },
-  { label: 'Pending', value: 'pending', color: 'orange', description: 'Waiting for action' },
-  { label: 'Completed', value: 'completed', color: 'blue', description: 'Task finished' },
-  { label: 'Cancelled', value: 'cancelled', color: 'red', description: 'Task cancelled' },
-];
+function createScrollHandler(fetchNextPage: () => void, hasNextPage: boolean, isFetchingMore: boolean) {
+  return (e: React.UIEvent<HTMLElement>) => {
+    const target = e.target as HTMLElement;
+    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < SCROLL_THRESHOLD;
 
-const categoryOptions: StaticOption[] = [
-  { label: 'Bug', value: 'bug', color: '#f5222d', group: 'Issues' },
-  { label: 'Feature', value: 'feature', color: '#1890ff', group: 'Issues' },
-  { label: 'Improvement', value: 'improvement', color: '#52c41a', group: 'Issues' },
-  { label: 'Documentation', value: 'docs', color: '#722ed1', group: 'Other' },
-  { label: 'Testing', value: 'testing', color: '#13c2c2', group: 'Other' },
-];
-
-// Sub-status options - depends on status (parentValue = status value)
-const subStatusOptions: StaticOption[] = [
-  // Active sub-statuses
-  { label: 'In Progress', value: 'in_progress', color: 'green', parentValue: 'active' },
-  { label: 'Under Review', value: 'under_review', color: 'cyan', parentValue: 'active' },
-  { label: 'On Hold', value: 'on_hold', color: 'orange', parentValue: 'active' },
-  // Pending sub-statuses
-  { label: 'Awaiting Approval', value: 'awaiting_approval', color: 'gold', parentValue: 'pending' },
-  { label: 'Scheduled', value: 'scheduled', color: 'purple', parentValue: 'pending' },
-  { label: 'Blocked', value: 'blocked', color: 'red', parentValue: 'pending' },
-  // Completed sub-statuses
-  { label: 'Verified', value: 'verified', color: 'blue', parentValue: 'completed' },
-  { label: 'Deployed', value: 'deployed', color: 'geekblue', parentValue: 'completed' },
-  { label: 'Archived', value: 'archived', color: 'default', parentValue: 'completed' },
-  // Cancelled sub-statuses
-  { label: 'Rejected', value: 'rejected', color: 'red', parentValue: 'cancelled' },
-  { label: 'Obsolete', value: 'obsolete', color: 'default', parentValue: 'cancelled' },
-  { label: 'Duplicate', value: 'duplicate', color: 'volcano', parentValue: 'cancelled' },
-];
+    if (isNearBottom && hasNextPage && !isFetchingMore) {
+      fetchNextPage();
+    }
+  };
+}
 
 // ============================================================================
 // Field Configs
 // ============================================================================
 
 const fieldConfigs: FieldConfig[] = [
-  {
-    name: 'userIds',
-    label: 'Users',
-    placeholder: 'Select users...',
-    mode: 'multiple',
-  },
-  {
-    name: 'projectIds',
-    label: 'Projects',
-    placeholder: 'Select projects...',
-    mode: 'multiple',
-    dependsOn: 'userIds',
-  },
-  {
-    name: 'taskIds',
-    label: 'Tasks',
-    placeholder: 'Select tasks...',
-    mode: 'multiple',
-    dependsOn: 'projectIds',
-  },
-  {
-    name: 'commentIds',
-    label: 'Comments',
-    placeholder: 'Select comments...',
-    mode: 'multiple',
-    dependsOn: ['userIds', 'taskIds'],
-  },
-  // Static fields
-  {
-    name: 'priority',
-    label: 'Priority',
-    placeholder: 'Select priority...',
-  },
-  {
-    name: 'status',
-    label: 'Status',
-    placeholder: 'Select status...',
-  },
-  {
-    name: 'subStatus',
-    label: 'Sub Status',
-    placeholder: 'Select sub status...',
-    dependsOn: 'status',
-  },
-  // Field wrapper examples (non-select fields)
-  {
-    name: 'description',
-    label: 'Description',
-    dependsOn: 'status',
-  },
-  {
-    name: 'amount',
-    label: 'Amount',
-    dependsOn: 'priority',
-  },
+  { name: 'userIds', mode: 'multiple' },
+  { name: 'projectIds', mode: 'multiple', dependsOn: 'userIds' },
+  { name: 'taskIds', mode: 'multiple', dependsOn: 'projectIds' },
 ];
 
 // ============================================================================
-// DevTools Connector - Must be inside XSelectProvider
-// ============================================================================
-
-function DevToolsConnector() {
-  const store = useXSelectStore();
-  useXSelectDevTools(store, 'XSelectDemo');
-  return null;
-}
-
-// ============================================================================
-// Main Demo Component
+// Demo Component
 // ============================================================================
 
 export function XSelectDemo() {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
 
-  // Load saved selections on mount
-  const {
-    data: savedSelections,
-    isLoading: isLoadingSelections,
-  } = useQuery<Selections | null>({
+  const { data: savedSelections, isLoading } = useQuery({
     queryKey: ['saved-selections'],
     queryFn: loadSelections,
   });
 
-  // Save mutation
   const saveMutation = useMutation({
     mutationFn: saveSelections,
     onSuccess: () => {
-      message.success('Selections saved successfully!');
+      message.success('Saved!');
       queryClient.invalidateQueries({ queryKey: ['saved-selections'] });
     },
-    onError: (error: Error) => {
-      message.error(`Failed to save: ${error.message}`);
-    },
+    onError: (error: Error) => message.error(error.message),
   });
 
-  // Create adapter for form sync
-  const adapter: FormAdapter = useMemo(
-    () => ({
-      onFieldChange: (name, value) => {
-        console.log({name, value});
-        form.setFieldValue(name, value)
-      },
-      onFieldsChange: (fields) =>
-        form.setFieldsValue(
-          Object.fromEntries(fields.map((f) => [f.name, f.value])),
-        ),
-    }),
-    [form],
-  );
+  const adapter: FormAdapter = useMemo(() => ({
+    onFieldChange: (name, value) => form.setFieldValue(name, value),
+    onFieldsChange: (fields) => form.setFieldsValue(
+      Object.fromEntries(fields.map((f) => [f.name, f.value])),
+    ),
+  }), [form]);
 
-  // Set form values when saved selections load
-  useEffect(() => {
-    if (savedSelections) {
-      form.setFieldsValue(savedSelections);
-    }
-  }, [savedSelections, form]);
-
-  // Handle save
-  const handleSave = () => {
-    const values = form.getFieldsValue();
-    console.log({values});
-    saveMutation.mutate(values);
-  };
-
-  // Handle reset
-  const handleReset = () => {
-    form.resetFields();
-  };
-
-  // Show loading while fetching saved selections
-  if (isLoadingSelections) {
+  if (isLoading) {
     return (
       <Card>
         <div style={{ textAlign: 'center', padding: 40 }}>
           <Spin size="large" />
-          <div style={{ marginTop: 16 }}>Loading saved selections...</div>
+          <div style={{ marginTop: 16 }}>Loading...</div>
         </div>
       </Card>
     );
@@ -546,369 +262,132 @@ export function XSelectDemo() {
 
   return (
     <Card>
-      <Title level={4}>XSelect Demo - Error Recovery UI</Title>
-      <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-        User → Project → Task → Comment cascading selects with infinite scroll.
-        Comment depends on BOTH Users AND Tasks (multiple parent dependencies).
+      <Title level={4}>XSelect Demo</Title>
+      <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
+        User → Project → Task cascading selects with infinite scroll
       </Text>
 
-      {/* Error Simulation Info */}
-      <div style={{
-        padding: '12px 16px',
-        marginBottom: 24,
-        backgroundColor: '#e6f4ff',
-        border: '1px solid #91caff',
-        borderRadius: 6,
-        fontSize: 13,
-      }}>
-        <strong>Error Simulation Active:</strong> The first 2 API calls for Users will fail.
-        <br />
-        Click <strong>Retry</strong> button twice to recover. After that, API will work normally.
-        <br />
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          Console commands: <code>window.toggleXSelectError()</code> to toggle,{' '}
-          <code>window.resetXSelectError()</code> to reset error count
-        </Text>
-      </div>
-
-      <XSelectErrorBoundary showDetails={process.env.NODE_ENV === 'development'}>
-        <XSelectProvider
-          configs={fieldConfigs}
-          adapter={adapter}
-          initialValues={savedSelections || {}}
-        >
-          <DevToolsConnector />
-          <Form form={form} layout="vertical">
-          {/* User Select - Infinite with Error Recovery UI */}
-          <Form.Item name="userIds" label="Users (with Error Recovery UI)">
+      <XSelectProvider
+        configs={fieldConfigs}
+        adapter={adapter}
+        initialValues={savedSelections ?? undefined}
+      >
+        <Form form={form} layout="vertical" initialValues={savedSelections ?? undefined}>
+          {/* Users */}
+          <Form.Item name="userIds" label="Users">
             <XSelect.Dependent name="userIds">
-              <XSelect.Infinite
+              <XSelect.Infinite<User>
                 queryKey="users"
-                fetchList={fetchUsers}
-                fetchByIds={fetchUsersByIds}
-                fetchStrategy='eager'
-                pageSize={10}
-                getItemId={(item) => (item as unknown as User).id}
-                getItemLabel={(item) =>
-                  `${(item as unknown as User).name} (${(item as unknown as User).email})`
-                }
+                listQuery={{
+                  queryFn: userListQuery,
+                  initialPageParam: 1,
+                  getNextPageParam: (lastPage) => lastPage.nextPage,
+                }}
+                hydrationQuery={{ queryFn: userHydrationQuery }}
+                itemAccessors={{
+                  getId: (item) => item.id,
+                  getLabel: (item) => `${item.name} (${item.email})`,
+                  
+                }}
               >
-                {({ value, onChange, options, loading, error, isRetrying, retry, onScroll, onOpenChange, onSearch }) => (
-                  <div>
-                    {error && (
-                      <ErrorDisplay
-                        error={error}
-                        onRetry={retry}
-                        isRetrying={isRetrying}
-                        style={{ marginBottom: 8 }}
-                      />
-                    )}
-                    <Select
-                      mode="multiple"
-                      value={value as number[]}
-                      onChange={onChange}
-                      options={options}
-                      loading={loading}
-                      placeholder="Select users..."
-                      style={{ width: '100%' }}
-                      onPopupScroll={onScroll}
-                      onDropdownVisibleChange={onOpenChange}
-                      showSearch
-                      onSearch={onSearch}
-                      filterOption={false}
-                      allowClear
-                      status={error ? 'error' : undefined}
-                    />
-                  </div>
+                {(props) => (
+                  <Select
+                    mode="multiple"
+                    value={props.value as number[]}
+                    onChange={props.onChange}
+                    options={props.options}
+                    loading={props.loading}
+                    placeholder="Select users..."
+                    style={{ width: '100%' }}
+                    allowClear
+                    showSearch
+                    filterOption={false}
+                    onSearch={props.onSearch}
+                    onDropdownVisibleChange={props.onOpenChange}
+                    onPopupScroll={createScrollHandler(props.fetchNextPage, props.hasNextPage, props.isFetchingMore)}
+                  />
                 )}
               </XSelect.Infinite>
             </XSelect.Dependent>
           </Form.Item>
 
-          {/* Project Select - Dependent + Infinite */}
+          {/* Projects */}
           <Form.Item name="projectIds" label="Projects">
             <XSelect.Dependent name="projectIds">
-              <XSelect.Infinite
+              <XSelect.Infinite<Project>
                 queryKey="projects"
-                fetchList={fetchProjects}
-                fetchByIds={fetchProjectsByIds}
-                pageSize={10}
-                getItemId={(item) => (item as unknown as Project).id}
-                getItemLabel={(item) => (item as unknown as Project).name}
-                getItemParentValue={(item) => {
-                  const project = item as unknown as Project;
-                  return [project.ownerId];
+                listQuery={{
+                  queryFn: projectListQuery,
+                  initialPageParam: 1,
+                  getNextPageParam: (lastPage) => lastPage.nextPage,
+                  fetchStrategy: "lazy"
+                }}
+                hydrationQuery={{ queryFn: projectHydrationQuery }}
+                itemAccessors={{
+                  getId: (item) => item.id,
+                  getLabel: (item) => item.name,
+                  getParentValue: (item) => item.ownerId,
                 }}
               >
-                <Select
-                  mode="multiple"
-                  placeholder="Select projects..."
-                  style={{ width: '100%' }}
-                />
+                {(props) => (
+                  <Select
+                    mode="multiple"
+                    value={props.value as number[]}
+                    onChange={props.onChange}
+                    options={props.options}
+                    loading={props.loading}
+                    disabled={props.disabled}
+                    placeholder="Select projects..."
+                    style={{ width: '100%' }}
+                    allowClear
+                    showSearch
+                    filterOption={false}
+                    onSearch={props.onSearch}
+                    onDropdownVisibleChange={props.onOpenChange}
+                    onPopupScroll={createScrollHandler(props.fetchNextPage, props.hasNextPage, props.isFetchingMore)}
+                  />
+                )}
               </XSelect.Infinite>
             </XSelect.Dependent>
           </Form.Item>
 
-          {/* Task Select - Dependent + Infinite */}
+          {/* Tasks */}
           <Form.Item name="taskIds" label="Tasks">
             <XSelect.Dependent name="taskIds">
-              <XSelect.Infinite
+              <XSelect.Infinite<Task>
                 queryKey="tasks"
-                fetchList={fetchTasks}
-                fetchByIds={fetchTasksByIds}
-                pageSize={10}
-                getItemId={(item) => (item as unknown as Task).id}
-                getItemLabel={(item) => (item as unknown as Task).title}
-                getItemParentValue={(item) => {
-                  // Each task belongs to exactly one project
-                  const task = item as unknown as Task;
-                  return task.projectId;
+                listQuery={{
+                  queryFn: taskListQuery,
+                  initialPageParam: 1,
+                  getNextPageParam: (lastPage) => lastPage.nextPage,
+                }}
+                hydrationQuery={{ queryFn: taskHydrationQuery }}
+                itemAccessors={{
+                  getId: (item) => item.id,
+                  getLabel: (item) => item.title,
+                  getParentValue: (item) => item.projectId,
                 }}
               >
-                <Select
-                  mode="multiple"
-                  placeholder="Select tasks..."
-                  style={{ width: '100%' }}
-                />
-              </XSelect.Infinite>
-            </XSelect.Dependent>
-          </Form.Item>
-
-          {/* Comment Select - Depends on userIds AND taskIds */}
-          <Form.Item name="commentIds" label="Comments (depends on Users + Tasks)">
-            <XSelect.Dependent name="commentIds">
-              <XSelect.Infinite
-                queryKey="comments"
-                fetchList={fetchComments}
-                fetchByIds={fetchCommentsByIds}
-                pageSize={10}
-                getItemId={(item) => (item as unknown as Comment).id}
-                getItemLabel={(item) => {
-                  const comment = item as unknown as Comment;
-                  const authorName = comment.author?.name || `User ${comment.authorId}`;
-                  const taskTitle = comment.task?.title || `Task ${comment.taskId}`;
-                  const contentPreview = comment.content.length > 30
-                    ? `${comment.content.slice(0, 30)}...`
-                    : comment.content;
-                  return `${contentPreview} (by ${authorName} on ${taskTitle})`;
-                }}
-                getItemParentValue={(item) => {
-                  const comment = item as unknown as Comment;
-                  return { userIds: [comment.authorId], taskIds: [comment.taskId] };
-                }}
-              >
-                <Select
-                  mode="multiple"
-                  placeholder="Select comments..."
-                  style={{ width: '100%' }}
-                />
-              </XSelect.Infinite>
-            </XSelect.Dependent>
-          </Form.Item>
-
-          {/* Filter Select - Infinite only (no dependency) */}
-          <Form.Item name="filterIds" label="Filters">
-            <XSelect.Infinite
-              queryKey="filters"
-              fetchList={fetchFilters}
-              fetchByIds={fetchFiltersByIds}
-              fetchStrategy="lazy"
-              pageSize={10}
-              getItemId={(item) => (item as unknown as Filter).id}
-              getItemLabel={(item) => {
-                const filter = item as unknown as Filter;
-                return `${filter.name} (${filter.page})`;
-              }}
-            >
-              <Select
-                mode="multiple"
-                placeholder="Select filters..."
-                style={{ width: '100%' }}
-              />
-            </XSelect.Infinite>
-          </Form.Item>
-
-          {/* Priority Select - Static with metadata */}
-          <Form.Item name="priority" label="Priority (Static with metadata)">
-            <XSelect.Dependent name="priority">
-              <XSelect.Static options={priorityOptions}>
-                {({ options, getOption, onChange, value }) => (
+                {(props) => (
                   <Select
-                    value={value}
-                    onChange={onChange}
-                    options={options}
-                    placeholder="Select priority..."
+                    mode="multiple"
+                    value={props.value as number[]}
+                    onChange={props.onChange}
+                    options={props.options}
+                    loading={props.loading}
+                    disabled={props.disabled}
+                    placeholder="Select tasks..."
                     style={{ width: '100%' }}
                     allowClear
-                    tagRender={({ value: tagValue, closable, onClose }) => {
-                      const opt = getOption(tagValue as string);
-                      return (
-                        <Tag
-                          color={opt?.color}
-                          closable={closable}
-                          onClose={onClose}
-                          style={{ marginRight: 3 }}
-                        >
-                          {opt?.label}
-                        </Tag>
-                      );
-                    }}
-                    optionRender={(option) => {
-                      const opt = getOption(option.value as string);
-                      return (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              backgroundColor: opt?.color,
-                            }}
-                          />
-                          <span>{opt?.label}</span>
-                          <span style={{ color: '#999', fontSize: 12 }}>
-                            {opt?.description}
-                          </span>
-                        </div>
-                      );
-                    }}
+                    showSearch
+                    filterOption={false}
+                    onSearch={props.onSearch}
+                    onDropdownVisibleChange={props.onOpenChange}
+                    onPopupScroll={createScrollHandler(props.fetchNextPage, props.hasNextPage, props.isFetchingMore)}
                   />
                 )}
-              </XSelect.Static>
+              </XSelect.Infinite>
             </XSelect.Dependent>
-          </Form.Item>
-
-          {/* Status Select - Static simple (parent of subStatus) */}
-          <Form.Item name="status" label="Status (Static simple)">
-            <XSelect.Dependent name="status">
-              <XSelect.Static options={statusOptions}>
-                <Select
-                  placeholder="Select status..."
-                  style={{ width: '100%' }}
-                  allowClear
-                />
-              </XSelect.Static>
-            </XSelect.Dependent>
-          </Form.Item>
-
-          {/* Sub Status Select - Static with dependency on status */}
-          <Form.Item name="subStatus" label="Sub Status (depends on Status)">
-            <XSelect.Dependent name="subStatus">
-              <XSelect.Static options={subStatusOptions}>
-                {({ options, getOption, onChange, value, disabled }) => (
-                  <Select
-                    value={value}
-                    onChange={onChange}
-                    options={options}
-                    disabled={disabled}
-                    placeholder="Select sub status..."
-                    style={{ width: '100%' }}
-                    allowClear
-                    tagRender={({ value: tagValue, closable, onClose }) => {
-                      const opt = getOption(tagValue as string);
-                      return (
-                        <Tag
-                          color={opt?.color}
-                          closable={closable}
-                          onClose={onClose}
-                          style={{ marginRight: 3 }}
-                        >
-                          {opt?.label}
-                        </Tag>
-                      );
-                    }}
-                  />
-                )}
-              </XSelect.Static>
-            </XSelect.Dependent>
-          </Form.Item>
-
-          {/* Category Select - Static multiple */}
-          <Form.Item name="categories" label="Categories (Static multiple)">
-            <XSelect.Static options={categoryOptions}>
-              {({ options, getOption, onChange, value }) => (
-                <Select
-                  mode="multiple"
-                  value={value}
-                  onChange={onChange}
-                  options={options}
-                  placeholder="Select categories..."
-                  style={{ width: '100%' }}
-                  allowClear
-                  tagRender={({ value: tagValue, closable, onClose }) => {
-                    const opt = getOption(tagValue as string);
-                    return (
-                      <Tag
-                        color={opt?.color}
-                        closable={closable}
-                        onClose={onClose}
-                        style={{ marginRight: 3 }}
-                      >
-                        {opt?.label}
-                      </Tag>
-                    );
-                  }}
-                />
-              )}
-            </XSelect.Static>
-          </Form.Item>
-
-          {/* ============================================================ */}
-          {/* XSelect.Field Examples - Non-Select Fields with Dependencies */}
-          {/* ============================================================ */}
-
-          {/* Description - TextArea depends on Status */}
-          <Form.Item name="description" label="Description (depends on Status - using XSelect.Field)">
-            <XSelect.Field name="description">
-              {({ value, onChange, disabled, parentValue }) => (
-                <Input.TextArea
-                  value={value as string}
-                  onChange={(e) => onChange(e.target.value)}
-                  disabled={disabled}
-                  placeholder={
-                    !parentValue
-                      ? 'Please select a status first...'
-                      : parentValue === 'active'
-                        ? 'Describe what is currently being worked on...'
-                        : parentValue === 'pending'
-                          ? 'Describe what is being waited for...'
-                          : parentValue === 'completed'
-                            ? 'Describe the completion summary...'
-                            : 'Describe the cancellation reason...'
-                  }
-                  rows={3}
-                  style={{ width: '100%' }}
-                />
-              )}
-            </XSelect.Field>
-          </Form.Item>
-
-          {/* Amount - InputNumber depends on Priority */}
-          <Form.Item name="amount" label="Amount (depends on Priority - using XSelect.Field)">
-            <XSelect.Field name="amount">
-              {({ value, onChange, disabled, parentValue }) => {
-                // Get priority level from meta
-
-                console.log({parentValue})
-                const priority = priorityOptions.find(p => p.value === parentValue);
-                const minAmount = priority?.meta?.level ? priority.meta.level * 100 : 0;
-
-                return (
-                  <InputNumber
-                    value={value as number}
-                    onChange={onChange}
-                    disabled={disabled}
-                    placeholder={disabled ? 'Select priority first' : `Min: ${minAmount}`}
-                    min={minAmount}
-                    max={10000}
-                    step={100}
-                    style={{ width: '100%' }}
-                    prefix={priority ? `Level ${priority.meta?.level}: ` : ''}
-                    suffix={parentValue ? String(parentValue).toUpperCase() : undefined}
-                  />
-                );
-              }}
-            </XSelect.Field>
           </Form.Item>
 
           {/* Actions */}
@@ -916,33 +395,19 @@ export function XSelectDemo() {
             <Space>
               <Button
                 type="primary"
-                onClick={handleSave}
+                onClick={() => saveMutation.mutate(form.getFieldsValue())}
                 loading={saveMutation.isPending}
               >
-                Save Selections
+                Save
               </Button>
-              <Button onClick={handleReset}>Reset</Button>
-              <Button
-                onClick={() => {
-                  const values = form.getFieldsValue();
-                  console.log('Current values:', values);
-                  message.info('Check console for values');
-                }}
-              >
+              <Button onClick={() => form.resetFields()}>Reset</Button>
+              <Button onClick={() => console.log(form.getFieldsValue())}>
                 Log Values
               </Button>
             </Space>
           </Form.Item>
-          </Form>
-        </XSelectProvider>
-      </XSelectErrorBoundary>
-
-      {/* Debug Info */}
-      <div style={{ marginTop: 24 }}>
-        <Text type="secondary">
-          Saved selections: {JSON.stringify(savedSelections || {})}
-        </Text>
-      </div>
+        </Form>
+      </XSelectProvider>
     </Card>
   );
 }

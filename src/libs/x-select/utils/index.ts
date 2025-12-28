@@ -142,11 +142,137 @@ function buildRelationshipMapInternal(configs: FieldConfig[]): RelationshipMap {
 export const buildRelationshipMap = memoizeWeak(buildRelationshipMapInternal);
 
 // ============================================================================
+// CIRCULAR DEPENDENCY DETECTION
+// ============================================================================
+
+/**
+ * Result of circular dependency detection.
+ */
+export interface CircularDependencyResult {
+  /** Whether a circular dependency was detected */
+  hasCircular: boolean;
+  /** The cycle path if found (e.g., ['A', 'B', 'C', 'A']) */
+  cyclePath: string[];
+}
+
+/**
+ * Detect circular dependencies in field configs.
+ * Uses DFS with color marking (white/gray/black).
+ *
+ * @example
+ * ```ts
+ * const configs = [
+ *   { name: 'A', dependsOn: 'C' },
+ *   { name: 'B', dependsOn: 'A' },
+ *   { name: 'C', dependsOn: 'B' },
+ * ];
+ * detectCircularDependency(configs);
+ * // Returns: { hasCircular: true, cyclePath: ['A', 'B', 'C', 'A'] }
+ * ```
+ */
+export function detectCircularDependency(
+  configs: FieldConfig[],
+): CircularDependencyResult {
+  // Build adjacency list (child -> parents)
+  const dependencyMap = new Map<string, string[]>();
+  const allFields = new Set<string>();
+
+  for (const config of configs) {
+    allFields.add(config.name);
+    const parents = normalizeDependsOn(config.dependsOn);
+    dependencyMap.set(config.name, parents);
+  }
+
+  // DFS with colors: 0 = white (unvisited), 1 = gray (in stack), 2 = black (done)
+  const colors = new Map<string, number>();
+  const parent = new Map<string, string>(); // For reconstructing cycle path
+
+  for (const field of allFields) {
+    colors.set(field, 0);
+  }
+
+  /**
+   * DFS visit - returns cycle start node if cycle found, null otherwise
+   */
+  function dfs(node: string): string | null {
+    colors.set(node, 1); // Mark as in-progress (gray)
+
+    const dependencies = dependencyMap.get(node) ?? [];
+    for (const dep of dependencies) {
+      // Skip if dependency is not a registered field
+      if (!allFields.has(dep)) continue;
+
+      const color = colors.get(dep);
+
+      if (color === 1) {
+        // Found a back edge - cycle detected!
+        parent.set(dep, node);
+        return dep;
+      }
+
+      if (color === 0) {
+        parent.set(dep, node);
+        const cycleStart = dfs(dep);
+        if (cycleStart !== null) {
+          return cycleStart;
+        }
+      }
+    }
+
+    colors.set(node, 2); // Mark as done (black)
+    return null;
+  }
+
+  // Run DFS from each unvisited node
+  for (const field of allFields) {
+    if (colors.get(field) === 0) {
+      const cycleStart = dfs(field);
+
+      if (cycleStart !== null) {
+        // Reconstruct cycle path
+        const cyclePath: string[] = [cycleStart];
+        let current = parent.get(cycleStart);
+
+        while (current && current !== cycleStart) {
+          cyclePath.push(current);
+          current = parent.get(current);
+        }
+        cyclePath.push(cycleStart); // Complete the cycle
+
+        return {
+          hasCircular: true,
+          cyclePath: cyclePath.reverse(),
+        };
+      }
+    }
+  }
+
+  return { hasCircular: false, cyclePath: [] };
+}
+
+/**
+ * Validate field configs and throw error if circular dependency detected.
+ *
+ * @throws Error if circular dependency is found
+ */
+export function validateNoCircularDependency(configs: FieldConfig[]): void {
+  const result = detectCircularDependency(configs);
+
+  if (result.hasCircular) {
+    throw new Error(
+      `[XSelect] Circular dependency detected: ${result.cyclePath.join(' → ')}. ` +
+      `This will cause infinite loops. Please fix your field configurations.`
+    );
+  }
+}
+
+// ============================================================================
 // DESCENDANTS TRAVERSAL
 // ============================================================================
 
 /**
  * Get all descendant field names (BFS traversal).
+ * Includes visited check to prevent infinite loops from circular dependencies.
  *
  * @example
  * ```ts
@@ -164,6 +290,7 @@ export function getDescendants(
   if (!startRelation || startRelation.children.length === 0) return [];
 
   const descendants: string[] = [];
+  const visited = new Set<string>([fieldName]); // Track visited to prevent cycles
   const queue: string[] = [fieldName];
   let queueIndex = 0;
 
@@ -175,6 +302,11 @@ export function getDescendants(
       const children = relationship.children;
       for (let i = 0; i < children.length; i++) {
         const childName = children[i];
+
+        // Skip if already visited (prevents infinite loop)
+        if (visited.has(childName)) continue;
+
+        visited.add(childName);
         descendants.push(childName);
         queue.push(childName);
       }
@@ -710,3 +842,10 @@ export function isEmpty(value: unknown): boolean {
 export function clearCaches(): void {
   // WeakMaps are automatically garbage collected
 }
+
+// ============================================================================
+// METADATA UTILITIES
+// ============================================================================
+
+export { buildMetadataFromOptions, isMetadataEmpty } from './metadata';
+export type { OptionWithParentValue } from './metadata';

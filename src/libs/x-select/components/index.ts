@@ -3,16 +3,19 @@
  */
 
 export {
+  // Compound component
   XSelect,
+
+  // Wrappers (work in both static and dynamic modes)
   DependentWrapper,
   InfiniteWrapper,
   StaticWrapper,
-  FieldWrapper,
   DependentContext,
   useDependentContext,
 } from './wrappers';
 
 export type {
+  // Wrapper props
   DependentWrapperProps,
   DependentInjectedProps,
   InfiniteWrapperProps,
@@ -20,8 +23,6 @@ export type {
   StaticWrapperProps,
   StaticInjectedProps,
   StaticOption,
-  FieldWrapperProps,
-  FieldInjectedProps,
 } from './wrappers';
 
 // Error Recovery Components

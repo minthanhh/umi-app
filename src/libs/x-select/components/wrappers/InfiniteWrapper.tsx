@@ -2,156 +2,122 @@
  * InfiniteWrapper - Infinite Scroll Select Wrapper
  *
  * Wrapper component for infinite scroll select.
- * Injects props into children (options, loading, onScroll, etc.).
+ * Injects props into children (options, loading, fetchNextPage, etc.).
  *
  * Features:
- * - Infinite scroll with React Query
- * - Hydration for selected values
+ * - Infinite scroll with React Query useInfiniteQuery
+ * - Hydration for selected values with useQuery
  * - Auto-get parentValue from DependentWrapper if nested
  * - Supports render props and React.cloneElement
+ * - Full React Query options support via listQuery and hydrationQuery
  *
- * @example Standalone usage
+ * NOTE: Scroll handling is NOT included. Use fetchNextPage in your onPopupScroll.
+ *
+ * @example Basic usage with render props
  * ```tsx
- * <InfiniteWrapper queryKey="users" fetchList={fetchUsers}>
- *   <Select placeholder="Select user" />
+ * <InfiniteWrapper
+ *   queryKey="users"
+ *   listQuery={{
+ *     queryFn: async ({ pageParam, queryKey }) => {
+ *       const [, , parentValue, search] = queryKey;
+ *       const res = await fetch(`/api/users?page=${pageParam}&search=${search}`);
+ *       const data = await res.json();
+ *       return { data: data.items, nextPage: data.hasMore ? pageParam + 1 : undefined };
+ *     },
+ *     initialPageParam: 1,
+ *     getNextPageParam: (lastPage) => lastPage.nextPage,
+ *   }}
+ *   hydrationQuery={{
+ *     queryFn: async (_, ids) => {
+ *       const res = await fetch(`/api/users?ids=${ids.join(',')}`);
+ *       return res.json();
+ *     },
+ *   }}
+ * >
+ *   {(props) => (
+ *     <Select
+ *       options={props.options}
+ *       loading={props.loading}
+ *       onPopupScroll={(e) => {
+ *         if (nearBottom(e) && props.hasNextPage) props.fetchNextPage();
+ *       }}
+ *     />
+ *   )}
  * </InfiniteWrapper>
  * ```
  *
- * @example Nested with DependentWrapper
+ * @example With itemAccessors
  * ```tsx
- * <DependentWrapper name="city">
- *   <InfiniteWrapper queryKey="cities" fetchList={fetchCities}>
- *     <Select placeholder="Select city" />
- *   </InfiniteWrapper>
- * </DependentWrapper>
+ * <InfiniteWrapper
+ *   queryKey="users"
+ *   listQuery={{ queryFn, initialPageParam: 1, getNextPageParam }}
+ *   itemAccessors={{
+ *     getId: (item) => item.id,
+ *     getLabel: (item) => item.name,
+ *     getParentValue: (item) => item.departmentId,
+ *   }}
+ * >
+ *   {(props) => <Select {...props} />}
+ * </InfiniteWrapper>
  * ```
  */
 
-import React, { isValidElement, useEffect, useMemo } from 'react';
-import type { ReactElement, ReactNode } from 'react';
+import React, { isValidElement, useCallback, useEffect, useMemo, useRef } from 'react';
+import type { ReactElement } from 'react';
 
-import { useXSelectStoreOptional } from '../../contexts';
-import { useInfiniteSelect } from '../../hooks';
+import { useXSelectStore } from '../../contexts';
+import { useAutoRegistration, useInfiniteSelect, useStableChildren, type RenderableChildren } from '../../hooks';
 import type {
   BaseItem,
-  FetchRequest,
-  FetchResponse,
+  HydrationQueryConfig,
   InfiniteOption,
+  ItemAccessors,
+  ListQueryConfig,
   SelectValue,
 } from '../../types';
-import { useDependentContext } from './DependentWrapper';
+import { buildMetadataFromOptions, isMetadataEmpty } from '../../utils/metadata';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-/**
- * Props injected into children.
- */
+/** Props injected into children. */
 export interface InfiniteInjectedProps<T extends BaseItem = BaseItem> {
-  /** Current value */
   value: SelectValue;
-
-  /** Change handler */
   onChange: (value: SelectValue) => void;
-
-  /** Formatted options */
   options: Array<{ label: string; value: string | number }>;
-
-  /** Raw options with item data */
   rawOptions: InfiniteOption<T>[];
-
-  /** Raw items */
   items: T[];
-
-  /** Selected items (full data) */
-  selectedItems: T[];
-
-  /** Initial loading */
   loading: boolean;
-
-  /** Hydrating selected values */
   isHydrating: boolean;
-
-  /** Fetching more */
   isFetchingMore: boolean;
-
-  /** Has next page */
   hasNextPage: boolean;
-
-  /** Dropdown open */
   isOpen: boolean;
-
-  /** Combined error (list or hydration) */
-  error: Error | null;
-
-  /** List query error */
-  listError: Error | null;
-
-  /** Hydration query error */
-  hydrationError: Error | null;
-
-  /** Whether currently retrying */
-  isRetrying: boolean;
-
-  /** Open/close handler */
   onOpenChange: (open: boolean) => void;
-
-  /** Scroll handler */
-  onScroll: (e: React.UIEvent<HTMLElement>) => void;
-
-  /** Search handler */
   onSearch: (value: string) => void;
-
-  /** Fetch next page */
   fetchNextPage: () => void;
-
-  /** Retry failed query */
-  retry: () => void;
-
-  /** Clear error and retry */
-  clearErrorAndRetry: () => void;
-
-  /** Disabled state */
   disabled?: boolean;
-
-  /** Parent value */
-  parentValue?: unknown;
 }
 
-/**
- * Props for InfiniteWrapper.
- */
+/** Props for InfiniteWrapper. */
 export interface InfiniteWrapperProps<T extends BaseItem = BaseItem> {
   /** Unique query key */
   queryKey: string;
 
-  /** Fetch list function */
-  fetchList: (request: FetchRequest) => Promise<FetchResponse<T>>;
+  /** List query configuration (useInfiniteQuery options) */
+  listQuery: ListQueryConfig<T>;
 
-  /** Fetch by IDs (for hydration) */
-  fetchByIds?: (
-    ids: Array<string | number>,
-    parentValue?: unknown,
-  ) => Promise<T[]>;
+  /** Hydration query configuration (useQuery options) */
+  hydrationQuery?: HydrationQueryConfig<T>;
 
-  /** Items per page (default: 20) */
-  pageSize?: number;
+  /** Item accessor functions */
+  itemAccessors?: ItemAccessors<T>;
 
-  /** Fetch strategy: 'eager' | 'lazy' (default: 'lazy') */
-  fetchStrategy?: 'eager' | 'lazy';
+  /** Field name (for auto-registration in standalone dynamic mode) */
+  name?: string;
 
-  /** Stale time for React Query (ms) */
-  staleTime?: number;
-
-  /** Get ID from item */
-  getItemId?: (item: T) => string | number;
-
-  /** Get label from item */
-  getItemLabel?: (item: T) => string;
-
-  /** Get parent value from item (for cascade delete) */
-  getItemParentValue?: (item: T) => unknown;
+  /** Parent field dependency (for auto-registration) */
+  dependsOn?: string | string[];
 
   /** Parent value (standalone usage) */
   parentValue?: unknown;
@@ -168,8 +134,57 @@ export interface InfiniteWrapperProps<T extends BaseItem = BaseItem> {
   /** Enable/disable query */
   enabled?: boolean;
 
+  /** Selection mode */
+  mode?: 'multiple' | 'tags';
+
   /** Children - ReactElement or render function */
-  children: ReactElement | ((props: InfiniteInjectedProps<T>) => ReactNode);
+  children: RenderableChildren<InfiniteInjectedProps<T>>;
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Check if parent value is empty */
+function isParentValueEmpty(parentValue: unknown): boolean {
+  if (parentValue === undefined || parentValue === null) return true;
+  if (Array.isArray(parentValue) && parentValue.length === 0) return true;
+  return false;
+}
+
+/** Props that can be passed to children select element. */
+interface ChildSelectProps {
+  value?: SelectValue;
+  onChange?: (value: SelectValue) => void;
+  options?: Array<{ label: string; value: string | number }>;
+  loading?: boolean;
+  disabled?: boolean;
+  onDropdownVisibleChange?: (open: boolean) => void;
+  showSearch?: boolean;
+  onSearch?: (value: string) => void;
+  filterOption?: boolean;
+  allowClear?: boolean;
+}
+
+/** Clone element with merged props for Select component. */
+function cloneSelectWithProps<T extends BaseItem>(
+  element: ReactElement<ChildSelectProps>,
+  injectedProps: InfiniteInjectedProps<T>,
+): ReactElement<ChildSelectProps> {
+  const childProps = element.props;
+
+  return React.cloneElement(element, {
+    value: injectedProps.value,
+    onChange: injectedProps.onChange,
+    options: injectedProps.options,
+    loading: injectedProps.loading,
+    disabled: childProps.disabled ?? injectedProps.disabled,
+    onDropdownVisibleChange: injectedProps.onOpenChange,
+    showSearch: true,
+    onSearch: injectedProps.onSearch,
+    filterOption: false,
+    allowClear: childProps.allowClear ?? true,
+  });
 }
 
 // ============================================================================
@@ -178,90 +193,52 @@ export interface InfiniteWrapperProps<T extends BaseItem = BaseItem> {
 
 export function InfiniteWrapper<T extends BaseItem = BaseItem>({
   queryKey,
-  fetchList,
-  fetchByIds,
-  pageSize,
-  fetchStrategy,
-  staleTime,
-  getItemId,
-  getItemLabel,
-  getItemParentValue,
-  parentValue: parentValueProp,
-  value: valueProp,
-  onChange: onChangeProp,
-  disabled: disabledProp,
+  listQuery,
+  hydrationQuery,
+  itemAccessors,
+  
+  name,
+  dependsOn,
+  parentValue,
+  value,
+  onChange,
+  disabled,
+  mode,
+  
   enabled = true,
   children,
+
+  ...restProps
 }: InfiniteWrapperProps<T>) {
-  const dependentContext = useDependentContext();
-  const store = useXSelectStoreOptional();
+  const stableChildren = useStableChildren(children);
+  const store = useXSelectStore();
 
-  // Resolve values - props take priority, then context
-  const parentValue = parentValueProp ?? dependentContext?.parentValue;
-  const value = (valueProp ?? dependentContext?.value) as SelectValue;
-  const isDisabledByParent = dependentContext?.isDisabledByParent ?? false;
+  useAutoRegistration({
+    name: name ?? '',
+    dependsOn,
+    mode,
+    skip: !name,
+  });
 
-  // Call BOTH onChangeProp and context onChange
-  // - onChangeProp: syncs value to external form (e.g., Antd Form via dynamic-form)
-  // - dependentContext.onChange: syncs value to XSelectStore for cascading
-  // This ensures proper cascading behavior when used with XSelectProvider
-  const handleChange = (newValue: SelectValue) => {
-    // Always sync to store first (for cascading to work)
-    if (dependentContext?.onChange) {
-      dependentContext.onChange(newValue);
-    }
-    // Then notify external form
-    if (onChangeProp) {
-      onChangeProp(newValue);
-    }
-  };
-
-  const hasDependency = dependentContext?.hasDependency ?? false;
+  const hasDependency = !!dependsOn;
 
   const isQueryEnabled = useMemo(() => {
     if (!enabled) return false;
-    if (hasDependency) {
-      if (parentValue === undefined || parentValue === null) return false;
-      if (Array.isArray(parentValue) && parentValue.length === 0) return false;
-    }
+    if (hasDependency && isParentValueEmpty(parentValue)) return false;
     return true;
   }, [enabled, hasDependency, parentValue]);
 
-  const fieldName = dependentContext?.name;
-
   const infiniteResult = useInfiniteSelect<T>({
     queryKey,
-    fetchList,
-    fetchByIds,
-    pageSize,
-    fetchStrategy,
-    staleTime,
-    getItemId,
-    getItemLabel,
-    getItemParentValue,
+    listQuery,
+    hydrationQuery,
+    itemAccessors,
     parentValue,
     value,
-    onChange: handleChange,
     enabled: isQueryEnabled,
   });
 
-  // Sync options with store for cascade delete
-  const storeOptions = useMemo(
-    () =>
-      infiniteResult.options.map((opt) => ({
-        label: opt.label,
-        value: opt.value,
-        parentValue: opt.parentValue as string | number | (string | number)[] | undefined,
-      })),
-    [infiniteResult.options],
-  );
-
-  useEffect(() => {
-    if (store && fieldName && storeOptions.length > 0) {
-      store.setExternalOptions(fieldName, storeOptions);
-    }
-  }, [store, fieldName, storeOptions]);
-
+  // Format options for Select component
   const formattedOptions = useMemo(
     () =>
       infiniteResult.options.map((opt) => ({
@@ -271,59 +248,68 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
     [infiniteResult.options],
   );
 
-  const isDisabled = disabledProp || isDisabledByParent;
+  // Current metadata for selected values (for hydration sync)
+  const selectedValuesMetadata = useMemo(
+    () => buildMetadataFromOptions(value, infiniteResult.options),
+    [value, infiniteResult.options],
+  );
 
+  // Enhanced onChange that syncs metadata BEFORE notifying form
+  const handleChange = useCallback(
+    (newValue: SelectValue) => {
+      // Sync metadata IMMEDIATELY when value changes
+      // This ensures metadata is available before any cascade delete
+      if (name) {
+        const newMetadata = buildMetadataFromOptions(newValue, infiniteResult.options);
+        console.log({newMetadata})
+        if (!isMetadataEmpty(newMetadata)) {
+          store.setValueMetadata(name, newMetadata);
+        }
+      }
+
+      // Then notify the form
+      onChange?.(newValue);
+    },
+    [name, store, infiniteResult.options, onChange],
+  );
+
+
+  // Build injected props
   const injectedProps: InfiniteInjectedProps<T> = {
-    value: infiniteResult.value,
-    onChange: infiniteResult.onChange,
+    ...restProps,
+    value,
+    onChange: handleChange,
+    disabled,
     options: formattedOptions,
     rawOptions: infiniteResult.options,
     items: infiniteResult.items,
-    selectedItems: infiniteResult.selectedItems,
     loading: infiniteResult.isLoading,
     isHydrating: infiniteResult.isHydrating,
     isFetchingMore: infiniteResult.isFetchingMore,
     hasNextPage: infiniteResult.hasNextPage,
     isOpen: infiniteResult.isOpen,
-    error: infiniteResult.error,
-    listError: infiniteResult.listError,
-    hydrationError: infiniteResult.hydrationError,
-    isRetrying: infiniteResult.isRetrying,
     onOpenChange: infiniteResult.onOpenChange,
-    onScroll: infiniteResult.onScroll,
     onSearch: infiniteResult.onSearch,
     fetchNextPage: infiniteResult.fetchNextPage,
-    retry: infiniteResult.retry,
-    clearErrorAndRetry: infiniteResult.clearErrorAndRetry,
-    disabled: isDisabled,
-    parentValue,
   };
 
-  if (typeof children === 'function') {
-    return <>{children(injectedProps)}</>;
-  }
+  // Sync metadata to store ONLY for hydration case
+  // When user selects from list, handleChange already syncs metadata
+  // This effect only runs when hydration completes (options fetched for existing values)
+  useEffect(() => {
+    // Only sync if we have hydrated options (not from user selection)
+    // isHydrating = false means hydration completed
+    if (name && !infiniteResult.isHydrating && !isMetadataEmpty(selectedValuesMetadata)) {
+      console.log({ [name]: selectedValuesMetadata})
+      store.setValueMetadata(name, selectedValuesMetadata);
+    }
+  }, [store, name, infiniteResult.isHydrating, selectedValuesMetadata]);
 
-  if (isValidElement(children)) {
-    return (
-      <>
-        {React.cloneElement(children as React.ReactElement<any>, {
-          value: injectedProps.value,
-          onChange: injectedProps.onChange,
-          options: injectedProps.options,
-          loading: injectedProps.loading,
-          disabled: (children.props as any).disabled ?? injectedProps.disabled,
-          onPopupScroll: injectedProps.onScroll,
-          onDropdownVisibleChange: injectedProps.onOpenChange,
-          showSearch: true,
-          onSearch: injectedProps.onSearch,
-          filterOption: false,
-          allowClear: (children.props as any).allowClear ?? true,
-        })}
-      </>
-    );
-  }
-
-  return <>{children}</>;
+  return typeof stableChildren === 'function'
+    ? stableChildren(injectedProps)
+    : isValidElement<ChildSelectProps>(stableChildren)
+      ? cloneSelectWithProps(stableChildren, injectedProps)
+      : stableChildren;
 }
 
 export default InfiniteWrapper;

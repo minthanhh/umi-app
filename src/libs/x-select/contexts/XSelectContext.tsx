@@ -6,6 +6,10 @@
  * 2. Stable Reference Pattern - useMemo/useCallback for context values
  * 3. Selective Subscription via useSyncExternalStore
  *
+ * Supports both:
+ * - Static mode: configs provided upfront (required)
+ * - Dynamic mode: configs optional, fields self-register via registerField()
+ *
  * Key exports:
  * - XSelectProvider: Provider component
  * - useXSelectField: Subscribe to a single field (optimized)
@@ -22,7 +26,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useSyncExternalStore,
 } from 'react';
 import type { ReactNode } from 'react';
@@ -34,6 +37,7 @@ import type {
   FieldValues,
   FormAdapter,
   XSelectOption,
+  ValueMetadataMap,
 } from '../types';
 
 // ============================================================================
@@ -51,7 +55,7 @@ const StoreContext = createContext<XSelectStore | null>(null);
 interface ActionsContextValue {
   setValue: (fieldName: string, value: unknown) => void;
   setValues: (values: Partial<FieldValues>) => void;
-  setExternalOptions: (fieldName: string, options: XSelectOption[]) => void;
+  setValueMetadata: (fieldName: string, metadata: ValueMetadataMap) => void;
   getValue: (fieldName: string) => unknown;
   getValues: () => FieldValues;
 }
@@ -80,8 +84,12 @@ const EMPTY_OPTIONS: XSelectOption[] = [];
 // ============================================================================
 
 export interface XSelectProviderProps {
-  /** Field configurations */
-  configs: FieldConfig[];
+  /**
+   * Field configurations.
+   * - Static mode: provide configs upfront
+   * - Dynamic mode: omit or pass empty array, fields will self-register via wrappers
+   */
+  configs?: FieldConfig[];
 
   /** Form adapter */
   adapter?: FormAdapter;
@@ -113,7 +121,7 @@ const InternalProvider = memo(function InternalProvider({
     () => ({
       setValue: store.setValue,
       setValues: store.setValues,
-      setExternalOptions: store.setExternalOptions,
+      setValueMetadata: store.setValueMetadata,
       getValue: (fieldName: string) => store.getFieldSnapshot(fieldName).value,
       getValues: store.getValues,
     }),
@@ -161,7 +169,7 @@ const InternalProvider = memo(function InternalProvider({
  * ```
  */
 export function XSelectProvider({
-  configs,
+  configs = [],
   adapter,
   initialValues,
   value: controlledValue,
@@ -382,15 +390,6 @@ export function useXSelectField(
     (newValue: unknown) => store.setValue(fieldName, newValue),
     [store, fieldName],
   );
-
-  // Sync external options
-  const previousOptionsRef = useRef<XSelectOption[] | undefined>(undefined);
-  if (externalOptions !== previousOptionsRef.current) {
-    previousOptionsRef.current = externalOptions;
-    if (externalOptions) {
-      store.setExternalOptions(fieldName, externalOptions);
-    }
-  }
 
   return {
     config: fieldConfig,

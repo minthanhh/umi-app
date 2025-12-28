@@ -1,6 +1,16 @@
 /**
  * XSelect - Wrapper Exports
+ *
+ * All wrappers now support both static mode (XSelectProvider with configs)
+ * and dynamic mode (DynamicXSelectProvider with auto-registration).
+ *
+ * In dynamic mode, wrappers automatically register themselves when mounted
+ * and unregister when unmounted.
  */
+
+// ============================================================================
+// WRAPPERS (work in both static and dynamic modes)
+// ============================================================================
 
 export {
   DependentWrapper,
@@ -15,8 +25,12 @@ export type { InfiniteWrapperProps, InfiniteInjectedProps } from './InfiniteWrap
 export { StaticWrapper } from './StaticWrapper';
 export type { StaticWrapperProps, StaticInjectedProps, StaticOption } from './StaticWrapper';
 
-export { FieldWrapper } from './FieldWrapper';
-export type { FieldWrapperProps, FieldInjectedProps } from './FieldWrapper';
+// ============================================================================
+// INTERNAL HOOKS (for wrapper implementation)
+// ============================================================================
+
+export { useUnifiedField } from './useUnifiedField';
+export type { UseUnifiedFieldOptions, UseUnifiedFieldResult } from './useUnifiedField';
 
 // ============================================================================
 // COMPOUND COMPONENT
@@ -25,32 +39,63 @@ export type { FieldWrapperProps, FieldInjectedProps } from './FieldWrapper';
 import { DependentWrapper } from './DependentWrapper';
 import { InfiniteWrapper } from './InfiniteWrapper';
 import { StaticWrapper } from './StaticWrapper';
-import { FieldWrapper } from './FieldWrapper';
 
 /**
  * XSelect compound component.
  *
- * @example With infinite scroll
+ * All wrappers now support auto-registration in dynamic mode!
+ * Just use DynamicXSelectProvider and pass `dependsOn` prop to wrappers.
+ *
+ * @example Static mode - With configs in Provider
  * ```tsx
- * <XSelect.Dependent name="city">
- *   <XSelect.Infinite queryKey="cities" fetchList={fetchCities}>
+ * const configs = [
+ *   { name: 'country', options: countries },
+ *   { name: 'city', dependsOn: 'country', options: cities },
+ * ];
+ *
+ * <XSelectProvider configs={configs}>
+ *   <XSelect.Dependent name="country">
  *     <Select />
- *   </XSelect.Infinite>
- * </XSelect.Dependent>
+ *   </XSelect.Dependent>
+ *   <XSelect.Dependent name="city">
+ *     <Select />
+ *   </XSelect.Dependent>
+ * </XSelectProvider>
  * ```
  *
- * @example With static options
+ * @example Dynamic mode - Auto-registration
  * ```tsx
- * <XSelect.Dependent name="status">
- *   <XSelect.Static options={statusOptions}>
+ * <DynamicXSelectProvider>
+ *   {schema.fields.map(field => (
+ *     <XSelect.Dependent
+ *       key={field.name}
+ *       name={field.name}
+ *       dependsOn={field.dependsOn}
+ *       options={field.options}
+ *     >
+ *       <Select />
+ *     </XSelect.Dependent>
+ *   ))}
+ * </DynamicXSelectProvider>
+ * ```
+ *
+ * @example Dynamic mode with Infinite scroll
+ * ```tsx
+ * <DynamicXSelectProvider>
+ *   <XSelect.Infinite
+ *     name="city"
+ *     dependsOn="country"
+ *     queryKey="cities"
+ *     fetchList={fetchCities}
+ *   >
  *     <Select />
- *   </XSelect.Static>
- * </XSelect.Dependent>
+ *   </XSelect.Infinite>
+ * </DynamicXSelectProvider>
  * ```
  */
 export const XSelect = {
+  // All wrappers work in both static and dynamic modes
   Dependent: DependentWrapper,
   Infinite: InfiniteWrapper,
   Static: StaticWrapper,
-  Field: FieldWrapper,
 };

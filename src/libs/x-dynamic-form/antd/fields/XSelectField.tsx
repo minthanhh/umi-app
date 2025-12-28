@@ -10,7 +10,6 @@
  * based on the config.
  */
 
-import React from 'react';
 import { Select, Tag } from 'antd';
 import type { FieldComponentProps } from '../../core';
 import type { XSelectFieldConfig, StaticSelectFieldConfig, InfiniteSelectFieldConfig } from '../types';
@@ -20,7 +19,7 @@ import {
   useXSelectStoreOptional,
   ErrorDisplay,
 } from '../../../x-select';
-import type { BaseItem, FetchRequest, FetchResponse, StaticOption } from '../../../x-select';
+import type { BaseItem } from '../../../x-select';
 
 // =============================================================================
 // STATIC SELECT FIELD
@@ -96,14 +95,9 @@ function InfiniteSelectInner<T extends BaseItem = BaseItem>({
   return (
     <XSelect.Infinite
       queryKey={config.queryKey}
-      fetchList={config.fetchList}
-      fetchByIds={config.fetchByIds}
-      pageSize={config.pageSize}
-      fetchStrategy={config.fetchStrategy}
-      staleTime={config.staleTime}
-      getItemId={config.getItemId}
-      getItemLabel={config.getItemLabel}
-      getItemParentValue={config.getItemParentValue}
+      listQuery={config.listQuery}
+      hydrationQuery={config.hydrationQuery}
+      itemAccessors={config.itemAccessors}
       value={value as any}
       onChange={propOnChange as any}
       disabled={isDisabled}

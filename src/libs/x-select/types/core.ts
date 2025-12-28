@@ -53,12 +53,23 @@ export interface FormattedOption {
 
 /**
  * Configuration for a cascading select field.
+ *
+ * Core fields for store logic:
+ * - name: field identification
+ * - dependsOn: cascade relationships
+ * - options: data source
+ * - mode: value type handling
+ * - filterOptions: custom filtering
+ *
+ * Optional UI fields:
+ * - label: display label
+ * - placeholder: placeholder text
  */
 export interface FieldConfig {
   /** Unique field identifier */
   name: string;
 
-  /** Display label */
+  /** Display label for the field */
   label?: string;
 
   /** Placeholder text */
@@ -84,9 +95,6 @@ export interface FieldConfig {
 
   /** Custom filter function for options */
   filterOptions?: (options: XSelectOption[], parentValue: unknown) => XSelectOption[];
-
-  /** Additional props for select component (UI-specific) */
-  selectProps?: Record<string, unknown>;
 }
 
 /**
@@ -193,3 +201,32 @@ export type SelectValue =
   | Array<string | number>
   | undefined
   | null;
+
+// ============================================================================
+// VALUE METADATA (for cascade delete)
+// ============================================================================
+
+/**
+ * Metadata for a single selected value.
+ * Contains only the parentValue needed for cascade delete.
+ */
+export interface ValueMetadataEntry {
+  /** Parent value(s) this value belongs to */
+  parentValue?: string | number | (string | number)[] | Record<string, unknown>;
+}
+
+/**
+ * Metadata map for all selected values of a field.
+ * Key is the value (string | number), value is its metadata.
+ *
+ * @example
+ * ```ts
+ * // city field with values ['D1', 'D7', 'HK']
+ * const metadata: ValueMetadataMap = {
+ *   'D1': { parentValue: 'HCM' },
+ *   'D7': { parentValue: 'HCM' },
+ *   'HK': { parentValue: 'HN' },
+ * };
+ * ```
+ */
+export type ValueMetadataMap = Record<string | number, ValueMetadataEntry>;

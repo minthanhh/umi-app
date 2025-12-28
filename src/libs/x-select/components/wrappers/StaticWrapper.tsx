@@ -47,12 +47,14 @@
  * ```
  */
 
-import React, { isValidElement, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { isValidElement, memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import { useQuery } from '@umijs/max';
+import { useQuery } from '@tanstack/react-query';
 
 import { useXSelectStoreOptional } from '../../contexts';
-import type { XSelectOption, SelectValue } from '../../types';
+import { useAutoRegistration, useStableChildren, type RenderableChildren } from '../../hooks';
+import type { XSelectOption, SelectValue, FormattedOption } from '../../types';
+import { buildMetadataFromOptions, isMetadataEmpty } from '../../utils/metadata';
 import { useDependentContext } from './DependentWrapper';
 
 // ============================================================================
@@ -90,7 +92,7 @@ export interface StaticInjectedProps<TMeta = unknown> {
   onChange: (value: SelectValue) => void;
 
   /** Formatted options for UI */
-  options: Array<{ label: string; value: string | number; disabled?: boolean }>;
+  options: FormattedOption[];
 
   /** Raw options with metadata */
   rawOptions: StaticOption<TMeta>[];
@@ -109,6 +111,9 @@ export interface StaticInjectedProps<TMeta = unknown> {
 
   /** Search handler */
   onSearch: (value: string) => void;
+
+  /** Dropdown open/close handler */
+  onOpenChange: (open: boolean) => void;
 
   /** Disabled state */
   disabled?: boolean;
@@ -129,6 +134,19 @@ export interface StaticInjectedProps<TMeta = unknown> {
 export interface StaticWrapperProps<TMeta = unknown> {
   /** Static options array */
   options?: StaticOption<TMeta>[];
+
+  /**
+   * Field name (for auto-registration in standalone dynamic mode).
+   * When used inside DependentWrapper, this is optional as the name comes from DependentContext.
+   * When used standalone in DynamicXSelectProvider, this enables auto-registration.
+   */
+  name?: string;
+
+  /**
+   * Parent field dependency (for auto-registration in standalone dynamic mode).
+   * When used inside DependentWrapper, this comes from DependentContext.
+   */
+  dependsOn?: string | string[];
 
   /** Query key for async fetch (optional) */
   queryKey?: string;
@@ -169,8 +187,11 @@ export interface StaticWrapperProps<TMeta = unknown> {
   /** Disabled state */
   disabled?: boolean;
 
+  /** Selection mode (for auto-registration, matches Ant Design Select modes) */
+  mode?: 'multiple' | 'tags';
+
   /** Children - ReactElement or render function */
-  children: ReactElement | ((props: StaticInjectedProps<TMeta>) => ReactNode);
+  children: RenderableChildren<StaticInjectedProps<TMeta>>;
 }
 
 // ============================================================================
@@ -244,12 +265,50 @@ function groupOptions<TMeta>(
   return groups;
 }
 
+/** Props that can be passed to children select element. */
+interface ChildSelectProps {
+  value?: SelectValue;
+  onChange?: (value: SelectValue) => void;
+  options?: FormattedOption[];
+  loading?: boolean;
+  disabled?: boolean;
+  showSearch?: boolean;
+  onSearch?: (value: string) => void;
+  filterOption?: boolean;
+  onDropdownVisibleChange?: (open: boolean) => void;
+  allowClear?: boolean;
+}
+
+/** Clone element with merged props for Select component. */
+function cloneSelectWithProps<TMeta>(
+  element: ReactElement<ChildSelectProps>,
+  injectedProps: StaticInjectedProps<TMeta>,
+  searchable: boolean,
+): ReactElement<ChildSelectProps> {
+  const childProps = element.props;
+
+  return React.cloneElement(element, {
+    value: injectedProps.value,
+    onChange: injectedProps.onChange,
+    options: injectedProps.options,
+    loading: injectedProps.loading,
+    disabled: childProps.disabled ?? injectedProps.disabled,
+    showSearch: searchable,
+    onSearch: searchable ? injectedProps.onSearch : undefined,
+    filterOption: searchable ? false : undefined, // We handle filtering
+    onDropdownVisibleChange: injectedProps.onOpenChange,
+    allowClear: childProps.allowClear ?? true,
+  });
+}
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
-export function StaticWrapper<TMeta = unknown>({
+function StaticWrapperInner<TMeta = unknown>({
   options: staticOptions,
+  name: nameProp,
+  dependsOn,
   queryKey,
   fetchOptions,
   staleTime = 5 * 60 * 1000, // 5 minutes default
@@ -261,10 +320,27 @@ export function StaticWrapper<TMeta = unknown>({
   value: valueProp,
   onChange: onChangeProp,
   disabled: disabledProp,
+  mode,
   children,
+  ...restProps
 }: StaticWrapperProps<TMeta>) {
+  const stableChildren = useStableChildren(children);
   const dependentContext = useDependentContext();
   const store = useXSelectStoreOptional();
+
+  // Field name: from prop (standalone) or from DependentContext (nested)
+  const fieldName = nameProp ?? dependentContext?.name;
+
+  // Auto-register if field not pre-configured (dynamic mode)
+  // Skip if already wrapped by DependentWrapper (which handles registration)
+  useAutoRegistration({
+    name: fieldName ?? '',
+    dependsOn,
+    options: staticOptions as XSelectOption[] | undefined,
+    mode,
+    // Skip if no name or already wrapped by DependentWrapper
+    skip: !fieldName || !!dependentContext,
+  });
 
   // State
   const [searchValue, setSearchValue] = useState('');
@@ -274,19 +350,6 @@ export function StaticWrapper<TMeta = unknown>({
   const value = (valueProp ?? dependentContext?.value) as SelectValue;
   const isDisabledByParent = dependentContext?.isDisabledByParent ?? false;
   const hasDependency = dependentContext?.hasDependency ?? false;
-  const fieldName = dependentContext?.name;
-
-  // Change handler
-  const handleChange = useCallback(
-    (newValue: SelectValue) => {
-      if (onChangeProp) {
-        onChangeProp(newValue);
-      } else {
-        dependentContext?.onChange(newValue);
-      }
-    },
-    [onChangeProp, dependentContext],
-  );
 
   // Query enabled logic
   const isQueryEnabled = useMemo(() => {
@@ -316,6 +379,28 @@ export function StaticWrapper<TMeta = unknown>({
     if (asyncOptions) return asyncOptions;
     return [];
   }, [staticOptions, asyncOptions]);
+
+  // Enhanced change handler that syncs metadata BEFORE notifying form
+  const handleChange = useCallback(
+    (newValue: SelectValue) => {
+      // Sync metadata IMMEDIATELY when value changes
+      // This ensures metadata is available before any cascade delete
+      if (store && fieldName) {
+        const newMetadata = buildMetadataFromOptions(newValue, baseOptions);
+        if (!isMetadataEmpty(newMetadata)) {
+          store.setValueMetadata(fieldName, newMetadata);
+        }
+      }
+
+      // Then notify the form
+      if (onChangeProp) {
+        onChangeProp(newValue);
+      } else {
+        dependentContext?.onChange(newValue);
+      }
+    },
+    [store, fieldName, baseOptions, onChangeProp, dependentContext],
+  );
 
   // Filter by parent value (if has dependency)
   const parentFilteredOptions = useMemo<StaticOption<TMeta>[]>(() => {
@@ -354,7 +439,7 @@ export function StaticWrapper<TMeta = unknown>({
   }, [value, optionsLookup]);
 
   // Format options for UI
-  const formattedOptions = useMemo(
+  const formattedOptions = useMemo<FormattedOption[]>(
     () =>
       filteredOptions.map((opt) => ({
         label: opt.label,
@@ -370,23 +455,22 @@ export function StaticWrapper<TMeta = unknown>({
     return groupOptions(filteredOptions, groupBy);
   }, [filteredOptions, groupBy]);
 
-  // Sync options with store for cascade delete
-  const storeOptions = useMemo(
-    () =>
-      baseOptions.map((opt) => ({
-        label: opt.label,
-        value: opt.value,
-        parentValue: opt.parentValue,
-        disabled: opt.disabled,
-      })),
-    [baseOptions],
+  // Build metadata map for selected values (for hydration sync)
+  const selectedValuesMetadata = useMemo(
+    () => buildMetadataFromOptions(value, baseOptions),
+    [value, baseOptions],
   );
 
+  // Sync metadata to store ONLY for initial load / async fetch case
+  // When user selects from list, handleChange already syncs metadata
+  // This effect only runs when async options are loaded (not from user selection)
   useEffect(() => {
-    if (store && fieldName && storeOptions.length > 0) {
-      store.setExternalOptions(fieldName, storeOptions);
+    // Only sync after loading completes (for async options)
+    // For static options, this runs once on mount
+    if (store && fieldName && !isLoading && !isMetadataEmpty(selectedValuesMetadata)) {
+      store.setValueMetadata(fieldName, selectedValuesMetadata);
     }
-  }, [store, fieldName, storeOptions]);
+  }, [store, fieldName, isLoading, selectedValuesMetadata]);
 
   // Search handler
   const handleSearch = useCallback((val: string) => {
@@ -403,7 +487,9 @@ export function StaticWrapper<TMeta = unknown>({
   const isDisabled = disabledProp || isDisabledByParent;
   const isLoadingState = fetchOptions ? isLoading : false;
 
+  // Build injected props
   const injectedProps: StaticInjectedProps<TMeta> = {
+    ...restProps,
     value,
     onChange: handleChange,
     options: formattedOptions,
@@ -413,36 +499,20 @@ export function StaticWrapper<TMeta = unknown>({
     error: error ?? null,
     searchValue,
     onSearch: handleSearch,
+    onOpenChange: handleOpenChange,
     disabled: isDisabled,
     parentValue,
     getOption,
     groupedOptions,
   };
 
-  if (typeof children === 'function') {
-    return <>{children(injectedProps)}</>;
-  }
-
-  if (isValidElement(children)) {
-    return (
-      <>
-        {React.cloneElement(children as React.ReactElement<any>, {
-          value: injectedProps.value,
-          onChange: injectedProps.onChange,
-          options: injectedProps.options,
-          loading: injectedProps.loading,
-          disabled: (children.props as any).disabled ?? injectedProps.disabled,
-          showSearch: searchable,
-          onSearch: searchable ? injectedProps.onSearch : undefined,
-          filterOption: searchable ? false : undefined, // We handle filtering
-          onDropdownVisibleChange: handleOpenChange,
-          allowClear: (children.props as any).allowClear ?? true,
-        })}
-      </>
-    );
-  }
-
-  return <>{children}</>;
+  // Render content
+  return typeof stableChildren === 'function'
+    ? stableChildren(injectedProps)
+    : isValidElement<ChildSelectProps>(stableChildren)
+      ? cloneSelectWithProps(stableChildren, injectedProps, searchable)
+      : stableChildren;
 }
 
+export const StaticWrapper = memo(StaticWrapperInner) as typeof StaticWrapperInner;
 export default StaticWrapper;

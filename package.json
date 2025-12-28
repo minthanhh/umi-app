@@ -1,6 +1,6 @@
 {
   "private": true,
-  "packageManager": "pnpm@10.24.0",
+  "packageManager": "pnpm@10.26.2",
   "author": "thanh.ho <thanh.ho@kegmil.com>",
   "scripts": {
     "build": "prisma generate && max build",
@@ -42,6 +42,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@umijs/plugins": "^4.6.0",
+    "@welldone-software/why-did-you-render": "^10.0.1",
     "esbuild": "^0.27.1",
     "husky": "^9",
     "lint-staged": "^16.2.7",

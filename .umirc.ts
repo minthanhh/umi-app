@@ -6,6 +6,7 @@ export default defineConfig({
   apiRoute: {
     platform: 'vercel',
   },
+  
 
   plugins: [require.resolve('./plugins/sw')],
   serviceWorker: {

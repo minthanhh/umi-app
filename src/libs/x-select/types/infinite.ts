@@ -5,6 +5,14 @@
  * Can be used standalone or combined with cascading select.
  */
 
+import type {
+  InfiniteData,
+  QueryFunction,
+  QueryKey,
+  UseInfiniteQueryOptions,
+  UseQueryOptions,
+} from '@tanstack/react-query';
+
 import type { XSelectOption } from './core';
 
 // ============================================================================
@@ -65,53 +73,117 @@ export interface FetchResponse<T> {
 }
 
 // ============================================================================
-// CONFIG TYPES
+// CONFIG TYPES (GROUPED PROPS)
 // ============================================================================
 
 /**
- * Configuration for Infinite Select.
+ * Internal page data structure for infinite query.
  */
-export interface InfiniteConfig<T extends BaseItem = BaseItem> {
-  /** Unique query key for React Query caching */
-  queryKey: string;
+export interface InfinitePageData<T> {
+  data: T[];
+  nextPage: number | undefined;
+  fetchedWithParentValue: unknown;
+}
 
-  /** Fetch list function */
-  fetchList: (request: FetchRequest) => Promise<FetchResponse<T>>;
+/**
+ * Base UseInfiniteQueryOptions with correct generics for XSelect.
+ *
+ * React Query v5 UseInfiniteQueryOptions generic parameters:
+ * - TQueryFnData: What queryFn returns per page (InfinitePageData<T>)
+ * - TError: Error type (Error)
+ * - TData: Transformed/selected data type (InfiniteData<InfinitePageData<T>>)
+ * - TQueryKey: Query key type (ListQueryKey)
+ * - TPageParam: Page parameter type (number)
+ */
+type BaseInfiniteQueryOptions<T extends BaseItem = BaseItem> = UseInfiniteQueryOptions<
+  InfinitePageData<T>,               // TQueryFnData - what queryFn returns per page
+  Error,                              // TError
+  InfiniteData<InfinitePageData<T>>, // TData - full infinite data structure
+  readonly unknown[],                       // TQueryKey
+  number                              // TPageParam - page number type
+>;
 
-  /** Optional: fetch by IDs (for hydration) */
-  fetchByIds?: (
-    ids: Array<string | number>,
-    parentValue?: unknown,
-  ) => Promise<T[]>;
-
-  /** Items per page (default: 20) */
-  pageSize?: number;
-
+/**
+ * List Query configuration - extends UseInfiniteQueryOptions.
+ * Omits fields that are managed internally by the hook.
+ *
+ * @example
+ * ```tsx
+ * const listQuery: ListQueryConfig<User> = {
+ *   queryFn: async ({ pageParam, queryKey }) => {
+ *     const [, , parentValue, search] = queryKey;
+ *     const res = await fetch(`/api/users?page=${pageParam}&search=${search}`);
+ *     const data = await res.json();
+ *     return {
+ *       data: data.items,
+ *       nextPage: data.hasMore ? pageParam + 1 : undefined,
+ *       fetchedWithParentValue: parentValue,
+ *     };
+ *   },
+ *   initialPageParam: 1,
+ *   getNextPageParam: (lastPage) => lastPage.nextPage,
+ *   staleTime: 5 * 60 * 1000,
+ *   gcTime: 10 * 60 * 1000,
+ * };
+ * ```
+ */
+export interface ListQueryConfig<T extends BaseItem = BaseItem>
+  extends Omit<
+    BaseInfiniteQueryOptions<T>,
+    // Managed internally by useInfiniteList
+    | 'queryKey'
+    | 'enabled'
+  > {
   /**
    * Fetch strategy:
-   * - 'eager': fetch on mount
-   * - 'lazy': fetch when dropdown opens (default)
+   * - 'eager': fetch immediately when parentValue changes (after debounce)
+   * - 'lazy': fetch only when dropdown opens (default)
    */
   fetchStrategy?: 'eager' | 'lazy';
+}
 
-  /** Stale time for React Query (ms) */
-  staleTime?: number;
+/**
+ * Extended QueryFunction that includes ids parameter for hydration.
+ * Extends React Query's QueryFunction signature.
+ */
+export type HydrationQueryFunction<T extends BaseItem = BaseItem> = (
+  ...args: [...Parameters<QueryFunction<T[]>>, ids: Array<string | number>]
+) => ReturnType<QueryFunction<T[]>>;
 
+/**
+ * Hydration Query configuration - extends UseQueryOptions.
+ * Omits fields that are managed internally by the hook.
+ */
+export interface HydrationQueryConfig<T extends BaseItem = BaseItem>
+  extends Omit<
+    UseQueryOptions<T[], Error, T[], readonly unknown[]>,
+    // Managed internally
+    | 'queryKey'
+    | 'enabled'
+    | 'queryFn'
+  > {
+    queryFn: HydrationQueryFunction<T>
+  }
+
+/**
+ * Item accessor functions.
+ */
+export interface ItemAccessors<T extends BaseItem = BaseItem> {
   /** Get ID from item (default: item.id) */
-  getItemId?: (item: T) => string | number;
+  getId?: (item: T) => string | number;
 
   /** Get label from item (default: item.name or item.id) */
-  getItemLabel?: (item: T) => string;
+  getLabel?: (item: T) => string;
 
   /**
    * Get parent value from item (for accurate cascade delete).
    *
    * @example
    * ```ts
-   * getItemParentValue: (project) => project.members?.map(m => m.userId)
+   * getParentValue: (project) => project.members?.map(m => m.userId)
    * ```
    */
-  getItemParentValue?: (item: T) => unknown;
+  getParentValue?: (item: T) => unknown;
 }
 
 // ============================================================================
@@ -265,13 +337,10 @@ export interface InfiniteInjectedProps<T extends BaseItem = BaseItem> {
   /** Open/close handler */
   onOpenChange: (open: boolean) => void;
 
-  /** Scroll handler */
-  onScroll: (e: React.UIEvent<HTMLElement>) => void;
-
-  /** Search handler */
+  /** Search handler (debounced) */
   onSearch: (value: string) => void;
 
-  /** Fetch next page */
+  /** Fetch next page manually */
   fetchNextPage: () => void;
 
   /** Retry failed query */

@@ -239,7 +239,6 @@ const DynamicPage: React.FC = () => {
   );
 
   const handleSubmit = (values: Record<string, unknown>) => {
-    console.log('Form values:', values);
     message.success('Form submitted successfully!');
   };
 

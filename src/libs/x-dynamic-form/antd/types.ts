@@ -8,9 +8,10 @@ import type { ReactNode } from 'react';
 import type { BaseFieldConfig, FieldConfig } from '../core';
 import type {
   BaseItem,
-  FetchRequest,
-  FetchResponse,
   StaticOption,
+  ListQueryConfig,
+  HydrationQueryConfig,
+  ItemAccessors,
 } from '../../x-select';
 
 // =============================================================================
@@ -220,27 +221,17 @@ export interface StaticSelectFieldConfig extends BaseXSelectFieldConfig {
 
 /**
  * Infinite select field configuration
- * For large datasets with pagination
+ * For large datasets with pagination (uses grouped props structure)
  */
 export interface InfiniteSelectFieldConfig<T extends BaseItem = BaseItem> extends BaseXSelectFieldConfig {
   /** Unique query key for React Query caching */
   queryKey: string;
-  /** Fetch list function */
-  fetchList: (request: FetchRequest) => Promise<FetchResponse<T>>;
-  /** Optional: fetch by IDs (for hydration) */
-  fetchByIds?: (ids: Array<string | number>, parentValue?: unknown) => Promise<T[]>;
-  /** Items per page (default: 20) */
-  pageSize?: number;
-  /** Fetch strategy: 'eager' | 'lazy' (default: 'lazy') */
-  fetchStrategy?: 'eager' | 'lazy';
-  /** Stale time for React Query (ms) */
-  staleTime?: number;
-  /** Get ID from item (default: item.id) */
-  getItemId?: (item: T) => string | number;
-  /** Get label from item (default: item.name or item.id) */
-  getItemLabel?: (item: T) => string;
-  /** Get parent value from item (for cascade delete) */
-  getItemParentValue?: (item: T) => unknown;
+  /** List query configuration */
+  listQuery: ListQueryConfig<T>;
+  /** Hydration query configuration (for pre-selected values) */
+  hydrationQuery?: HydrationQueryConfig<T>;
+  /** Item accessors (getId, getLabel, getParentValue) */
+  itemAccessors?: ItemAccessors<T>;
   /** Enable/disable query */
   enabled?: boolean;
   /** Show error display component (default: true) */
