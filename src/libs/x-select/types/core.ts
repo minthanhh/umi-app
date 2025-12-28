@@ -164,31 +164,6 @@ export type RelationshipMap = Map<string, FieldRelationship>;
 export type StoreListener = () => void;
 
 // ============================================================================
-// GENERIC TYPES
-// ============================================================================
-
-/**
- * Generic option with typed value.
- */
-export type TypedOption<TValue extends string | number = string | number> = Omit<
-  XSelectOption,
-  'value'
-> & {
-  value: TValue;
-};
-
-/**
- * Generic option with typed parent value.
- */
-export type TypedOptionWithParent<
-  TValue extends string | number = string | number,
-  TParent extends string | number = string | number,
-> = XSelectOption & {
-  value: TValue;
-  parentValue?: TParent | TParent[];
-};
-
-// ============================================================================
 // SELECT VALUE TYPE
 // ============================================================================
 

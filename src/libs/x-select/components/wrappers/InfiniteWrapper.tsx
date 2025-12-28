@@ -62,7 +62,7 @@
  * ```
  */
 
-import React, { isValidElement, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { isValidElement, useCallback, useEffect, useMemo } from 'react';
 import type { ReactElement } from 'react';
 
 import { useXSelectStore } from '../../contexts';
@@ -261,7 +261,6 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
       // This ensures metadata is available before any cascade delete
       if (name) {
         const newMetadata = buildMetadataFromOptions(newValue, infiniteResult.options);
-        console.log({newMetadata})
         if (!isMetadataEmpty(newMetadata)) {
           store.setValueMetadata(name, newMetadata);
         }
@@ -300,7 +299,6 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
     // Only sync if we have hydrated options (not from user selection)
     // isHydrating = false means hydration completed
     if (name && !infiniteResult.isHydrating && !isMetadataEmpty(selectedValuesMetadata)) {
-      console.log({ [name]: selectedValuesMetadata})
       store.setValueMetadata(name, selectedValuesMetadata);
     }
   }, [store, name, infiniteResult.isHydrating, selectedValuesMetadata]);

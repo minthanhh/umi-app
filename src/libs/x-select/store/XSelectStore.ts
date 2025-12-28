@@ -40,6 +40,7 @@ import type {
   ValueMetadataEntry,
 } from '../types';
 
+import { EMPTY_SNAPSHOT } from '../constants';
 import {
   areValuesEqual,
   buildRelationshipMap,
@@ -103,12 +104,6 @@ interface OptionsCacheEntry {
 // ============================================================================
 
 const EMPTY_ARRAY: readonly XSelectOption[] = Object.freeze([]);
-
-const EMPTY_SNAPSHOT: FieldSnapshot = Object.freeze({
-  value: undefined,
-  parentValue: undefined,
-  isLoading: false,
-});
 
 // ============================================================================
 // STORE CLASS

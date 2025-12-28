@@ -829,12 +829,9 @@ export function normalizeToArray<T>(value: T | T[] | null | undefined): T[] {
 
 /**
  * Check if value is empty.
+ * @deprecated Use isEmpty from '../constants' instead
  */
-export function isEmpty(value: unknown): boolean {
-  if (value === undefined || value === null) return true;
-  if (Array.isArray(value)) return value.length === 0;
-  return false;
-}
+export { isEmpty } from '../constants';
 
 /**
  * Clear internal caches (for testing).
