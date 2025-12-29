@@ -7,12 +7,22 @@
  * - Hydration for selected values
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Form, message, Select, Space, Spin, Typography } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Button,
+  Card,
+  Form,
+  Input,
+  message,
+  Select,
+  Space,
+  Spin,
+  Typography,
+} from 'antd';
 import { useMemo } from 'react';
 
-import { XSelectProvider, XSelect } from '../index';
 import type { FieldConfig, FormAdapter, InfinitePageData } from '../index';
+import { XSelect, XSelectProvider } from '../index';
 
 const { Title, Text } = Typography;
 
@@ -79,7 +89,9 @@ async function fetchApi<T>(url: string): Promise<ApiResponse<T>> {
   return res.json();
 }
 
-function buildParams(params: Record<string, string | number | undefined>): URLSearchParams {
+function buildParams(
+  params: Record<string, string | number | undefined>,
+): URLSearchParams {
   const urlParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined) urlParams.set(key, String(value));
@@ -98,15 +110,30 @@ function createListQueryFn<T>(
     getParentValue?: (parentValue: unknown) => string | undefined;
   },
 ) {
-  return async ({ pageParam = 1, queryKey }: { pageParam: number; queryKey: readonly unknown[] }): Promise<InfinitePageData<T>> => {
-    const [, , parentValue, search] = queryKey as [string, string, unknown, string];
+  return async ({
+    pageParam = 1,
+    queryKey,
+  }: {
+    pageParam: number;
+    queryKey: readonly unknown[];
+  }): Promise<InfinitePageData<T>> => {
+    const [, , parentValue, search] = queryKey as [
+      string,
+      string,
+      unknown,
+      string,
+    ];
 
     // Get parent IDs if applicable
     let parentIds: string | undefined;
     if (options?.getParentValue) {
       parentIds = options.getParentValue(parentValue);
       if (options.parentField && !parentIds) {
-        return { data: [], nextPage: undefined, fetchedWithParentValue: parentValue };
+        return {
+          data: [],
+          nextPage: undefined,
+          fetchedWithParentValue: parentValue,
+        };
       }
     }
 
@@ -120,7 +147,9 @@ function createListQueryFn<T>(
       limit: '10',
       cursor,
       keyword: search || undefined,
-      ...(options?.parentField && parentIds ? { parentField: options.parentField, parentValue: parentIds } : {}),
+      ...(options?.parentField && parentIds
+        ? { parentField: options.parentField, parentValue: parentIds }
+        : {}),
     });
 
     const response = await fetchApi<T>(`/api/v2/${endpoint}/options?${params}`);
@@ -139,9 +168,14 @@ function createListQueryFn<T>(
 }
 
 function createHydrationQueryFn<T>(endpoint: string) {
-  return async (_context: unknown, ids: Array<string | number>): Promise<T[]> => {
+  return async (
+    _context: unknown,
+    ids: Array<string | number>,
+  ): Promise<T[]> => {
     if (!ids.length) return [];
-    const response = await fetchApi<T>(`/api/v2/${endpoint}/options?ids=${ids.join(',')}`);
+    const response = await fetchApi<T>(
+      `/api/v2/${endpoint}/options?ids=${ids.join(',')}`,
+    );
     return response.data || [];
   };
 }
@@ -199,10 +233,16 @@ async function saveSelections(selections: Selections): Promise<Selections> {
 
 const SCROLL_THRESHOLD = 50;
 
-function createScrollHandler(fetchNextPage: () => void, hasNextPage: boolean, isFetchingMore: boolean) {
+function createScrollHandler(
+  fetchNextPage: () => void,
+  hasNextPage: boolean,
+  isFetchingMore: boolean,
+) {
   return (e: React.UIEvent<HTMLElement>) => {
     const target = e.target as HTMLElement;
-    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < SCROLL_THRESHOLD;
+    const isNearBottom =
+      target.scrollHeight - target.scrollTop - target.clientHeight <
+      SCROLL_THRESHOLD;
 
     if (isNearBottom && hasNextPage && !isFetchingMore) {
       fetchNextPage();
@@ -242,12 +282,16 @@ export function XSelectDemo() {
     onError: (error: Error) => message.error(error.message),
   });
 
-  const adapter: FormAdapter = useMemo(() => ({
-    onFieldChange: (name, value) => form.setFieldValue(name, value),
-    onFieldsChange: (fields) => form.setFieldsValue(
-      Object.fromEntries(fields.map((f) => [f.name, f.value])),
-    ),
-  }), [form]);
+  const adapter: FormAdapter = useMemo(
+    () => ({
+      onFieldChange: (name, value) => form.setFieldValue(name, value),
+      onFieldsChange: (fields) =>
+        form.setFieldsValue(
+          Object.fromEntries(fields.map((f) => [f.name, f.value])),
+        ),
+    }),
+    [form],
+  );
 
   if (isLoading) {
     return (
@@ -272,7 +316,11 @@ export function XSelectDemo() {
         adapter={adapter}
         initialValues={savedSelections ?? undefined}
       >
-        <Form form={form} layout="vertical" initialValues={savedSelections ?? undefined}>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={savedSelections ?? undefined}
+        >
           {/* Users */}
           <Form.Item name="userIds" label="Users">
             <XSelect.Dependent name="userIds">
@@ -287,7 +335,6 @@ export function XSelectDemo() {
                 itemAccessors={{
                   getId: (item) => item.id,
                   getLabel: (item) => `${item.name} (${item.email})`,
-                  
                 }}
               >
                 {(props) => (
@@ -304,7 +351,11 @@ export function XSelectDemo() {
                     filterOption={false}
                     onSearch={props.onSearch}
                     onDropdownVisibleChange={props.onOpenChange}
-                    onPopupScroll={createScrollHandler(props.fetchNextPage, props.hasNextPage, props.isFetchingMore)}
+                    onPopupScroll={createScrollHandler(
+                      props.fetchNextPage,
+                      props.hasNextPage,
+                      props.isFetchingMore,
+                    )}
                   />
                 )}
               </XSelect.Infinite>
@@ -320,7 +371,7 @@ export function XSelectDemo() {
                   queryFn: projectListQuery,
                   initialPageParam: 1,
                   getNextPageParam: (lastPage) => lastPage.nextPage,
-                  fetchStrategy: "lazy"
+                  fetchStrategy: 'lazy',
                 }}
                 hydrationQuery={{ queryFn: projectHydrationQuery }}
                 itemAccessors={{
@@ -344,7 +395,11 @@ export function XSelectDemo() {
                     filterOption={false}
                     onSearch={props.onSearch}
                     onDropdownVisibleChange={props.onOpenChange}
-                    onPopupScroll={createScrollHandler(props.fetchNextPage, props.hasNextPage, props.isFetchingMore)}
+                    onPopupScroll={createScrollHandler(
+                      props.fetchNextPage,
+                      props.hasNextPage,
+                      props.isFetchingMore,
+                    )}
                   />
                 )}
               </XSelect.Infinite>
@@ -383,10 +438,32 @@ export function XSelectDemo() {
                     filterOption={false}
                     onSearch={props.onSearch}
                     onDropdownVisibleChange={props.onOpenChange}
-                    onPopupScroll={createScrollHandler(props.fetchNextPage, props.hasNextPage, props.isFetchingMore)}
+                    onPopupScroll={createScrollHandler(
+                      props.fetchNextPage,
+                      props.hasNextPage,
+                      props.isFetchingMore,
+                    )}
                   />
                 )}
               </XSelect.Infinite>
+            </XSelect.Dependent>
+          </Form.Item>
+
+          <Form.Item name="summary" label="Summary">
+            <XSelect.Dependent name="summary" dependsOn={'taskIds'}>
+              {({ value, onChange, disabled }) => (
+                <Input
+                  value={value}
+                  disabled={disabled}
+                  onChange={(e) => onChange(e.target.value)}
+                />
+              )}
+            </XSelect.Dependent>
+          </Form.Item>
+
+          <Form.Item name="description" label="Description">
+            <XSelect.Dependent name="description" dependsOn={'summary'}>
+              <Input />
             </XSelect.Dependent>
           </Form.Item>
 

@@ -165,7 +165,9 @@ export function useInfiniteList<T extends BaseItem = BaseItem>(
   const pendingParentValueRef = useRef<unknown>(parentValue);
   const isOpenRef = useRef(false);
 
-  const searchText = isSearchControlled ? externalSearchText : internalSearchText;
+  const searchText = isSearchControlled
+    ? externalSearchText
+    : internalSearchText;
 
   // ============================================================================
   // PARENT VALUE DEBOUNCE LOGIC
@@ -196,8 +198,19 @@ export function useInfiniteList<T extends BaseItem = BaseItem>(
         setCommittedParentValue(parentValue);
         parentValueTimeoutRef.current = null;
       }, parentValueDebounceMs);
+    } else if (fetchStrategy === 'lazy' && isOpenRef.current) {
+      // Lazy BUT dropdown is open: Commit immediately with debounce
+      // This fixes the bug where parent changes while dropdown is open
+      parentValueTimeoutRef.current = setTimeout(() => {
+        setCommittedParentValue(parentValue);
+        // Also reset search when parent changes to avoid stale cached results
+        if (!isSearchControlled) {
+          setInternalSearchText('');
+        }
+        parentValueTimeoutRef.current = null;
+      }, parentValueDebounceMs);
     }
-    // Lazy: Don't commit here, will commit on dropdown open
+    // Lazy with dropdown closed: Don't commit here, will commit on dropdown open
 
     return () => {
       if (parentValueTimeoutRef.current) {
@@ -205,7 +218,13 @@ export function useInfiniteList<T extends BaseItem = BaseItem>(
         parentValueTimeoutRef.current = null;
       }
     };
-  }, [parentValue, committedParentValue, fetchStrategy, parentValueDebounceMs]);
+  }, [
+    parentValue,
+    committedParentValue,
+    fetchStrategy,
+    parentValueDebounceMs,
+    isSearchControlled,
+  ]);
 
   // ============================================================================
   // CLEANUP
@@ -214,7 +233,8 @@ export function useInfiniteList<T extends BaseItem = BaseItem>(
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-      if (parentValueTimeoutRef.current) clearTimeout(parentValueTimeoutRef.current);
+      if (parentValueTimeoutRef.current)
+        clearTimeout(parentValueTimeoutRef.current);
     };
   }, []);
 
@@ -232,29 +252,35 @@ export function useInfiniteList<T extends BaseItem = BaseItem>(
   // HANDLERS
   // ============================================================================
 
-  const handleOpenChange = useCallback((open: boolean) => {
-    isOpenRef.current = open;
-    setIsOpen(open);
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      isOpenRef.current = open;
+      setIsOpen(open);
 
-    if (open) {
-      setHasOpenedOnce(true);
+      if (open) {
+        setHasOpenedOnce(true);
 
-      // Lazy: Commit pending parentValue on open
-      if (fetchStrategy === 'lazy') {
-        const pendingSerialized = serializeParentValue(pendingParentValueRef.current);
-        const committedSerialized = serializeParentValue(committedParentValue);
+        // Lazy: Commit pending parentValue on open
+        if (fetchStrategy === 'lazy') {
+          const pendingSerialized = serializeParentValue(
+            pendingParentValueRef.current,
+          );
+          const committedSerialized =
+            serializeParentValue(committedParentValue);
 
-        if (pendingSerialized !== committedSerialized) {
-          // Clear any pending timeout
-          if (parentValueTimeoutRef.current) {
-            clearTimeout(parentValueTimeoutRef.current);
-            parentValueTimeoutRef.current = null;
+          if (pendingSerialized !== committedSerialized) {
+            // Clear any pending timeout
+            if (parentValueTimeoutRef.current) {
+              clearTimeout(parentValueTimeoutRef.current);
+              parentValueTimeoutRef.current = null;
+            }
+            setCommittedParentValue(pendingParentValueRef.current);
           }
-          setCommittedParentValue(pendingParentValueRef.current);
         }
       }
-    }
-  }, [fetchStrategy, committedParentValue]);
+    },
+    [fetchStrategy, committedParentValue],
+  );
 
   const handleSearch = useCallback(
     (searchValue: string) => {

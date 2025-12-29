@@ -19,6 +19,7 @@
  * - useXSelectValues: Get all values
  */
 
+import type { ReactNode } from 'react';
 import {
   createContext,
   memo,
@@ -28,7 +29,6 @@ import {
   useMemo,
   useSyncExternalStore,
 } from 'react';
-import type { ReactNode } from 'react';
 
 import { XSelectStore } from '../store';
 import type {
@@ -36,8 +36,8 @@ import type {
   FieldSnapshot,
   FieldValues,
   FormAdapter,
-  XSelectOption,
   ValueMetadataMap,
+  XSelectOption,
 } from '../types';
 
 // ============================================================================
@@ -224,7 +224,9 @@ export function useXSelectStore(): XSelectStore {
   const store = useContext(StoreContext);
 
   if (!store) {
-    throw new Error('[XSelect] useXSelectStore must be used within XSelectProvider');
+    throw new Error(
+      '[XSelect] useXSelectStore must be used within XSelectProvider',
+    );
   }
 
   return store;
@@ -245,7 +247,9 @@ export function useXSelectActions(): ActionsContextValue {
   const actions = useContext(ActionsContext);
 
   if (!actions) {
-    throw new Error('[XSelect] useXSelectActions must be used within XSelectProvider');
+    throw new Error(
+      '[XSelect] useXSelectActions must be used within XSelectProvider',
+    );
   }
 
   return actions;
@@ -258,7 +262,9 @@ export function useXSelectConfig(): ConfigContextValue {
   const config = useContext(ConfigContext);
 
   if (!config) {
-    throw new Error('[XSelect] useXSelectConfig must be used within XSelectProvider');
+    throw new Error(
+      '[XSelect] useXSelectConfig must be used within XSelectProvider',
+    );
   }
 
   return config;
@@ -346,11 +352,13 @@ export function useXSelectField(
     [store, fieldName],
   );
 
-  // Get filtered options
+  // Options are now managed by components (InfiniteWrapper, StaticWrapper) directly
+  // This hook only provides external options if passed
   const filteredOptions = useMemo(() => {
-    const options = store.getOptions(fieldName, externalOptions);
-    return options.length > 0 ? options : EMPTY_OPTIONS;
-  }, [store, fieldName, fieldSnapshot.parentValue, externalOptions]);
+    return externalOptions && externalOptions.length > 0
+      ? externalOptions
+      : EMPTY_OPTIONS;
+  }, [externalOptions]);
 
   // Check if disabled by parent
   const isDisabledByParent = useMemo(() => {
@@ -367,9 +375,7 @@ export function useXSelectField(
       const values = Object.values(parentVal as Record<string, unknown>);
       return values.some(
         (v) =>
-          v === undefined ||
-          v === null ||
-          (Array.isArray(v) && v.length === 0),
+          v === undefined || v === null || (Array.isArray(v) && v.length === 0),
       );
     }
 

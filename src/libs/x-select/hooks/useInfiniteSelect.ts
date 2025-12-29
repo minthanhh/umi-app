@@ -17,7 +17,6 @@
  * NOTE: This hook depends on @tanstack/react-query.
  */
 
-
 import type {
   BaseItem,
   HydrationQueryConfig,
@@ -182,6 +181,7 @@ export function useInfiniteSelect<T extends BaseItem = BaseItem>(
     listItemsWithParent: listResult.itemsWithParent,
     hydratedItems: hydrationResult.items,
     itemAccessors,
+    currentParentValue: parentValue,
   });
 
   // ============================================================================

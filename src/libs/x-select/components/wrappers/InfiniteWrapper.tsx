@@ -62,11 +62,16 @@
  * ```
  */
 
-import React, { isValidElement, useCallback, useMemo, useRef } from 'react';
 import type { ReactElement } from 'react';
+import React, { isValidElement, useCallback, useMemo, useRef } from 'react';
 
 import { useXSelectStore } from '../../contexts';
-import { useAutoRegistration, useInfiniteSelect, useStableChildren, type RenderableChildren } from '../../hooks';
+import {
+  useAutoRegistration,
+  useInfiniteSelect,
+  useStableChildren,
+  type RenderableChildren,
+} from '../../hooks';
 import type {
   BaseItem,
   HydrationQueryConfig,
@@ -76,7 +81,10 @@ import type {
   SelectValue,
   ValueMetadataMap,
 } from '../../types';
-import { buildMetadataFromOptions, isMetadataEmpty } from '../../utils/metadata';
+import {
+  buildMetadataFromOptions,
+  isMetadataEmpty,
+} from '../../utils/metadata';
 
 // ============================================================================
 // STABLE OPTIONS CACHE
@@ -114,7 +122,10 @@ function useStableFormattedOptions<T extends BaseItem>(
         }
       } else {
         // Create new object and cache it
-        const newOption: FormattedOption = { label: opt.label, value: opt.value };
+        const newOption: FormattedOption = {
+          label: opt.label,
+          value: opt.value,
+        };
         cache.set(opt.value, newOption);
         result.push(newOption);
         hasChanged = true;
@@ -123,7 +134,7 @@ function useStableFormattedOptions<T extends BaseItem>(
 
     // Clean up stale cache entries periodically (when cache is 2x larger than needed)
     if (cache.size > options.length * 2) {
-      const currentValues = new Set(options.map(o => o.value));
+      const currentValues = new Set(options.map((o) => o.value));
       for (const key of cache.keys()) {
         if (!currentValues.has(key)) {
           cache.delete(key);
@@ -260,7 +271,7 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
   listQuery,
   hydrationQuery,
   itemAccessors,
-  
+
   name,
   dependsOn,
   parentValue,
@@ -268,13 +279,12 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
   onChange,
   disabled,
   mode,
-  
+
   enabled = true,
   children,
 
   ...restProps
 }: InfiniteWrapperProps<T>) {
-  console.log("InfiniteWrapper re-render", name);
   const stableChildren = useStableChildren(children);
   const store = useXSelectStore();
 
@@ -308,7 +318,9 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
 
   // Maintain a stable Map of options for O(1) metadata lookup
   // This prevents race conditions when options array changes during selection
-  const optionsMapRef = useRef<Map<string | number, InfiniteOption<T>>>(new Map());
+  const optionsMapRef = useRef<Map<string | number, InfiniteOption<T>>>(
+    new Map(),
+  );
 
   // Keep optionsMap in sync with options array
   useMemo(() => {
@@ -319,7 +331,7 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
     }
     // Cleanup: limit map size to prevent unbounded growth
     if (map.size > infiniteResult.options.length * 3) {
-      const currentValues = new Set(infiniteResult.options.map(o => o.value));
+      const currentValues = new Set(infiniteResult.options.map((o) => o.value));
       for (const key of map.keys()) {
         if (!currentValues.has(key)) {
           map.delete(key);
@@ -356,7 +368,11 @@ export function InfiniteWrapper<T extends BaseItem = BaseItem>({
               (typeof pv === 'object' && pv !== null)
             ) {
               newMetadata[val as string | number] = {
-                parentValue: pv as string | number | (string | number)[] | Record<string, unknown>,
+                parentValue: pv as
+                  | string
+                  | number
+                  | (string | number)[]
+                  | Record<string, unknown>,
               };
               hasMetadata = true;
             }

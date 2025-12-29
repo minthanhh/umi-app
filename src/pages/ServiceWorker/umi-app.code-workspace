@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../../../../umi-app.api"
+		},
+		{
+			"path": "../../../../../dashboard-builder"
 		}
 	],
 	"settings": {}

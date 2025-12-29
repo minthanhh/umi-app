@@ -31,6 +31,9 @@ export interface UseSelectOptionsOptions<T extends BaseItem = BaseItem> {
 
   /** Item accessor functions */
   itemAccessors?: ItemAccessors<T>;
+
+  /** Current parent value (used to clear cache when parent changes) */
+  currentParentValue?: unknown;
 }
 
 export interface UseSelectOptionsResult<T extends BaseItem = BaseItem> {
@@ -61,7 +64,12 @@ const defaultGetLabel = <T extends BaseItem>(item: T): string => {
 export function useSelectOptions<T extends BaseItem = BaseItem>(
   options: UseSelectOptionsOptions<T>,
 ): UseSelectOptionsResult<T> {
-  const { listItemsWithParent, hydratedItems, itemAccessors } = options;
+  const {
+    listItemsWithParent,
+    hydratedItems,
+    itemAccessors,
+    currentParentValue,
+  } = options;
 
   // Extract accessors with defaults
   const getId = itemAccessors?.getId ?? defaultGetId;
@@ -69,12 +77,21 @@ export function useSelectOptions<T extends BaseItem = BaseItem>(
   const getParentValue = itemAccessors?.getParentValue;
 
   // Cache for structural sharing of option objects
-  const optionsCacheRef = useRef<Map<string | number, InfiniteOption<T>>>(new Map());
+  const optionsCacheRef = useRef<Map<string | number, InfiniteOption<T>>>(
+    new Map(),
+  );
+  const prevParentValueRef = useRef<unknown>(currentParentValue);
   const prevResultRef = useRef<{
     items: T[];
     options: InfiniteOption<T>[];
     parentValueMap: Map<string | number, unknown>;
   } | null>(null);
+
+  // Clear cache when parent value changes to prevent stale options
+  if (currentParentValue !== prevParentValueRef.current) {
+    optionsCacheRef.current.clear();
+    prevParentValueRef.current = currentParentValue;
+  }
 
   // ============================================================================
   // SINGLE-PASS MERGE, DEDUP, AND TRANSFORM

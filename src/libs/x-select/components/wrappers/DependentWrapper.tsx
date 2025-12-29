@@ -32,11 +32,25 @@
  * ```
  */
 
-import React, { createContext, isValidElement, memo, useContext, useMemo } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import React, {
+  createContext,
+  isValidElement,
+  memo,
+  useContext,
+  useMemo,
+} from 'react';
 
-import { RenderableChildren, useAutoRegistration, useStableChildren } from '../../hooks';
-import type { XSelectOption, FormattedOption, DependentContextValue } from '../../types';
+import {
+  RenderableChildren,
+  useAutoRegistration,
+  useStableChildren,
+} from '../../hooks';
+import type {
+  DependentContextValue,
+  FormattedOption,
+  XSelectOption,
+} from '../../types';
 import { useUnifiedField } from './useUnifiedField';
 
 // ============================================================================
@@ -51,7 +65,7 @@ export interface DependentInjectedProps {
   parentValue?: unknown;
   options?: FormattedOption[];
   loading?: boolean;
-  name: string
+  name: string;
 }
 
 /** Props for DependentWrapper. */
@@ -80,7 +94,9 @@ export interface DependentWrapperProps {
 // CONTEXT
 // ============================================================================
 
-export const DependentContext = createContext<DependentContextValue | null>(null);
+export const DependentContext = createContext<DependentContextValue | null>(
+  null,
+);
 
 /** Hook to get context from DependentWrapper (if nested). */
 export function useDependentContext(): DependentContextValue | null {
@@ -96,7 +112,7 @@ interface ChildSelectProps {
   loading?: boolean;
   parentValue?: unknown;
   mode?: 'multiple' | 'tags';
-  name: string
+  name: string;
 }
 
 /** Clone element with merged props (child props take priority). */
@@ -133,7 +149,7 @@ function DependentWrapperInner({
   children,
   ...restProps
 }: DependentWrapperProps) {
-  console.log("DependentWrapperInner re-render", name);
+  console.log('DependentWrapperInner re-render', name);
   const stableChildren = useStableChildren(children);
 
   // Auto-register if field not pre-configured (dynamic mode)
@@ -153,13 +169,12 @@ function DependentWrapperInner({
     value,
     parentValue,
     parentValues,
-    isLoading: storeLoading,
     isDisabledByParent,
     onChange,
   } = useUnifiedField(name, { options: externalOptions });
 
   // Resolve states
-  const loading = externalLoading ?? storeLoading;
+  const loading = externalLoading ?? false;
   const disabled = disabledProp || isDisabledByParent;
   const options = externalOptions ?? storeOptions;
 
@@ -187,7 +202,16 @@ function DependentWrapperInner({
       isLoading: loading,
       hasDependency: !!fieldConfig?.dependsOn,
     }),
-    [name, value, parentValue, parentValues, onChange, disabled, loading, fieldConfig?.dependsOn],
+    [
+      name,
+      value,
+      parentValue,
+      parentValues,
+      onChange,
+      disabled,
+      loading,
+      fieldConfig?.dependsOn,
+    ],
   );
 
   // Warn if field not found

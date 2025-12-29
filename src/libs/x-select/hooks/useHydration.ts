@@ -16,8 +16,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
-import type { BaseItem, HydrationQueryConfig, SelectValue } from '../types';
 import { DEFAULT_VALUES } from '../constants';
+import type { BaseItem, HydrationQueryConfig, SelectValue } from '../types';
 
 // ============================================================================
 // TYPES
@@ -50,9 +50,12 @@ export interface UseHydrationResult<T extends BaseItem = BaseItem> {
 // ============================================================================
 
 function extractIds(value: SelectValue): Array<string | number> {
-  if (value === undefined || value === null) return DEFAULT_VALUES.arr as Array<string | number>;
+  if (value === undefined || value === null)
+    return DEFAULT_VALUES.arr as Array<string | number>;
   if (Array.isArray(value)) {
-    return value.filter((v) => v !== null && v !== undefined) as Array<string | number>;
+    return value.filter((v) => v !== null && v !== undefined) as Array<
+      string | number
+    >;
   }
   return [value as string | number];
 }
@@ -84,12 +87,17 @@ export function useHydration<T extends BaseItem = BaseItem>(
   // INITIAL IDS (captured once on mount)
   // ============================================================================
 
-  const [idsToHydrate] = useState<Array<string | number>>(() => extractIds(initialValue));
+  const [idsToHydrate] = useState<Array<string | number>>(() =>
+    extractIds(initialValue),
+  );
   const hasQueryFn = !!hydrationQuery?.queryFn;
 
   // Create stable key for better React Query cache hits
   // This allows multiple components hydrating same IDs to share the cache
-  const stableIdKey = useMemo(() => createStableIdKey(idsToHydrate), [idsToHydrate]);
+  const stableIdKey = useMemo(
+    () => createStableIdKey(idsToHydrate),
+    [idsToHydrate],
+  );
 
   // ============================================================================
   // HYDRATION QUERY (runs once, independent from list)
@@ -98,7 +106,6 @@ export function useHydration<T extends BaseItem = BaseItem>(
 
   const queryResult = useQuery<T[], Error, T[], readonly unknown[]>({
     staleTime: hydrationQuery?.staleTime ?? Infinity,
-    // Use gcTime to keep hydrated data in cache longer
     gcTime: hydrationQuery?.gcTime ?? 1000 * 60 * 30, // 30 minutes default
     ...hydrationQuery,
     queryFn: hasQueryFn
